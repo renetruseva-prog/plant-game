@@ -1,14 +1,18 @@
 {
   "expo": {
-    "name": "plant_app",
+    "name": "Specimen",
     "slug": "plant_app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "plantapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMotionUsageDescription": "Specimen reacts when you walk with it or shake it."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -25,14 +29,28 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#E6EEE3",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Specimen uses your location only to tell whether you carried it outside."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Specimen reacts when you walk with it or shake it."
+        }
+      ],
+      "expo-notifications"
     ],
     "experiments": {
       "typedRoutes": true,

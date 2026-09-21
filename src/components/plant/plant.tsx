@@ -1,0 +1,369 @@
+import { useEffect, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
+import Svg, {
+  Circle,
+  Defs,
+  Ellipse,
+  G,
+  Path,
+  RadialGradient,
+  Rect,
+  Stop,
+} from 'react-native-svg';
+
+import type { EndingKind, Mood } from '@/game/types';
+
+import { Face } from './face';
+
+const INK = '#16251B';
+export const VIEW_W = 300;
+export const VIEW_H = 380;
+
+/** Stem height and head radius per level: the whole growth curve in two maps. */
+const STEM_H: Record<number, number> = { 1: 0, 2: 58, 3: 104, 4: 142, 5: 152 };
+const HEAD_R: Record<number, number> = { 1: 15, 2: 20, 3: 27, 4: 33, 5: 24 };
+
+const hexToRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+
+function mix(a: string, b: string, k: number) {
+  const A = hexToRgb(a);
+  const B = hexToRgb(b);
+  return (
+    '#' +
+    A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, '0')).join('')
+  );
+}
+
+type Props = {
+  level: number;
+  mood: Mood;
+  /** Tendency at level 4, or the locked-in ending at level 5. */
+  form: EndingKind | null;
+  ending: EndingKind | null;
+  /** 0..1 share of the run that was rough. Tints the head as it sours. */
+  roughRatio: number;
+  /** Bumped on every level-up to fire the pop. */
+  popKey: number;
+  /** Live device tilt, -1..1. */
+  tilt?: SharedValue<number>;
+};
+
+export function Plant({ level, mood, form, ending, roughRatio, popKey, tilt }: Props) {
+  const breathe = useSharedValue(0);
+  const sway = useSharedValue(0);
+  const jitter = useSharedValue(0);
+  const pop = useSharedValue(1);
+
+  // One looping driver per mood; the unused ones are parked at 0 so the styles
+  // below can simply sum their contributions.
+  useEffect(() => {
+    cancelAnimation(breathe);
+    cancelAnimation(sway);
+    cancelAnimation(jitter);
+
+    const slow = mood === 'sleep';
+    breathe.value = 0;
+    breathe.value = withRepeat(
+      withTiming(1, { duration: slow ? 3500 : 2000, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+
+    if (mood === 'happy' || mood === 'sway') {
+      sway.value = withRepeat(
+        withTiming(1, { duration: 550, easing: Easing.inOut(Easing.ease) }),
+        -1,
+        true
+      );
+    } else {
+      sway.value = withTiming(0, { duration: 260 });
+    }
+
+    if (mood === 'hurt') {
+      jitter.value = withRepeat(withTiming(1, { duration: 80, easing: Easing.linear }), -1, true);
+    } else {
+      jitter.value = withTiming(0, { duration: 160 });
+    }
+  }, [mood, breathe, sway, jitter]);
+
+  // Skip the very first pass so the plant doesn't pop just for existing.
+  const settled = useRef(false);
+  useEffect(() => {
+    if (!settled.current) {
+      settled.current = true;
+      return;
+    }
+    pop.value = 0.86;
+    pop.value = withSpring(1, { damping: 7, stiffness: 190, mass: 0.6 });
+  }, [popKey, pop]);
+
+  const style = useAnimatedStyle(() => {
+    const swayDeg = (sway.value * 2 - 1) * 3.5;
+    const jitterDeg = (jitter.value * 2 - 1) * 2;
+    const jitterX = (jitter.value * 2 - 1) * 3;
+    const leanDeg = (tilt?.value ?? 0) * 3;
+    return {
+      transform: [
+        { translateX: jitterX },
+        { rotate: `${swayDeg + jitterDeg + leanDeg}deg` },
+        { scaleX: pop.value * (1 + breathe.value * 0.015) },
+        { scaleY: pop.value * (1 + breathe.value * 0.03) },
+      ],
+    };
+  });
+
+  const stemH = STEM_H[Math.min(level, 5)];
+  const r = ending === 'good' ? 26 : ending === 'bad' ? 36 : HEAD_R[Math.min(level, 5)];
+  const lean = form === 'bad' ? 12 : 0;
+  const cx = 150 + lean;
+  const cy = level === 1 ? 292 : 300 - stemH;
+
+  let head =
+    level === 1
+      ? '#9A7449'
+      : ending === 'bad'
+        ? '#2B1140'
+        : ending === 'good'
+          ? '#F6C945'
+          : ending === 'neutral'
+            ? '#8DBF6A'
+            : mix('#86CF74', '#6D4C93', Math.min(1, roughRatio * 2.2));
+  if (form === 'bad' && !ending) head = mix(head, '#3A1858', 0.5);
+
+  const stemC = ending === 'bad' ? '#3B1D57' : '#3E9B57';
+  const leafC = ending === 'bad' ? '#4A2270' : ending === 'good' ? '#4DB262' : '#5FAE5B';
+
+  /** Point a fraction `f` up the stem, following its curve. */
+  const at = (f: number): [number, number] => [150 + (cx - 150) * f * f, 300 - stemH * f];
+
+  const leafPath = (size: number) =>
+    `M0 0C${size * 0.4} ${-size * 0.55} ${size * 0.95} ${-size * 0.4} ${size} ${-size * 0.05}C${
+      size * 0.6
+    } ${size * 0.3} ${size * 0.2} ${size * 0.25} 0 0Z`;
+
+  const bladePath = (dx: number, h: number, cv: number) =>
+    `M${150 + dx} 304Q${150 + dx + cv * 0.4} ${304 - h * 0.6} ${150 + dx + cv} ${304 - h}`;
+
+  const leaves: [number, number, number][] =
+    level === 2
+      ? [
+          [0.8, 1, 26],
+          [0.8, -1, 26],
+        ]
+      : level === 3
+        ? [
+            [0.4, 1, 38],
+            [0.4, -1, 38],
+            [0.72, 1, 34],
+            [0.72, -1, 34],
+          ]
+        : [
+            [0.28, 1, 50],
+            [0.28, -1, 50],
+            [0.52, 1, 46],
+            [0.52, -1, 46],
+            [0.76, 1, 40],
+            [0.76, -1, 40],
+          ];
+
+  const stemD = `M150 302Q150 ${300 - stemH * 0.5} ${cx} ${cy}`;
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {/* Static pot and shadow: they must not breathe with the plant. */}
+      <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
+        <Ellipse cx={150} cy={370} rx={76} ry={7} fill="rgba(0,0,0,0.16)" />
+        <Path
+          d="M94 306h112l-11 62h-90z"
+          fill="#F4F6F0"
+          stroke={INK}
+          strokeWidth={2.4}
+          strokeLinejoin="round"
+        />
+        <Rect x={88} y={298} width={124} height={14} rx={6} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
+        <Ellipse cx={150} cy={300} rx={58} ry={7} fill="#4A3B2F" />
+      </Svg>
+
+      <Animated.View style={[StyleSheet.absoluteFill, styles.origin, style]}>
+        <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
+          <Defs>
+            <RadialGradient id="redglow">
+              <Stop offset="0" stopColor="#FF3B6B" stopOpacity={0.75} />
+              <Stop offset="1" stopColor="#FF3B6B" stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+
+          {ending === 'bad' ? <Circle cx={cx} cy={cy} r={r * 2.6} fill="url(#redglow)" /> : null}
+
+          {ending === 'neutral' ? (
+            <G>
+              {/* Ordinary grass: a flat tuft of blades, no stem at all. */}
+              {(
+                [
+                  [-46, 70, -14],
+                  [-32, 98, -8],
+                  [-18, 124, -4],
+                  [-6, 86, 10],
+                  [8, 134, 6],
+                  [20, 106, 14],
+                  [34, 90, 10],
+                  [48, 66, 16],
+                  [-58, 54, -20],
+                ] as [number, number, number][]
+              ).map(([dx, h, cv], i) => (
+                <Path
+                  key={i}
+                  d={bladePath(dx, h, cv)}
+                  stroke={['#4DA85A', '#6DBB5E', '#3E9B57'][i % 3]}
+                  strokeWidth={6}
+                  fill="none"
+                  strokeLinecap="round"
+                />
+              ))}
+              <Circle cx={150} cy={286} r={r} fill={head} stroke={INK} strokeWidth={2.4} />
+              <Face x={150} y={286} r={r} mood={mood} form={form} ending={ending} />
+            </G>
+          ) : (
+            <G>
+              {level >= 2 ? (
+                <G>
+                  <Path d={stemD} stroke={INK} strokeWidth={10} fill="none" strokeLinecap="round" />
+                  <Path d={stemD} stroke={stemC} strokeWidth={6} fill="none" strokeLinecap="round" />
+                  {leaves.map(([f, side, size], i) => {
+                    const [lx, ly] = at(f);
+                    return (
+                      <Path
+                        key={i}
+                        d={leafPath(size * (ending === 'good' ? 1.1 : 1))}
+                        fill={leafC}
+                        stroke={INK}
+                        strokeWidth={1.6}
+                        strokeLinejoin="round"
+                        transform={`translate(${lx} ${ly}) scale(${side} 1) rotate(-22)`}
+                      />
+                    );
+                  })}
+                  {level === 4 && form === 'neutral'
+                    ? (
+                        [
+                          [-40, 40, -10],
+                          [-20, 56, -4],
+                          [22, 52, 6],
+                          [42, 38, 12],
+                          [0, 46, 2],
+                        ] as [number, number, number][]
+                      ).map(([dx, h, cv], i) => (
+                        <Path
+                          key={`b${i}`}
+                          d={bladePath(dx, h, cv)}
+                          stroke="#5FAE5B"
+                          strokeWidth={5}
+                          fill="none"
+                          strokeLinecap="round"
+                        />
+                      ))
+                    : null}
+                </G>
+              ) : null}
+
+              <G transform={`translate(${cx} ${cy})`}>
+                {form === 'good' && level >= 4
+                  ? Array.from({ length: ending ? 14 : 8 }, (_, i) => {
+                      const n = ending ? 14 : 8;
+                      const len = ending ? r * 1.15 : r * 0.75;
+                      const w = ending ? 9 : 6;
+                      return (
+                        <Ellipse
+                          key={i}
+                          cx={0}
+                          cy={-(r + len * 0.42)}
+                          rx={w}
+                          ry={len * 0.55}
+                          fill="#fff"
+                          stroke={INK}
+                          strokeWidth={1.6}
+                          opacity={ending ? 1 : 0.9}
+                          transform={`rotate(${(i * 360) / n})`}
+                        />
+                      );
+                    })
+                  : null}
+                {form === 'bad' && level >= 4
+                  ? Array.from({ length: ending ? 12 : 8 }, (_, i) => {
+                      const n = ending ? 12 : 8;
+                      const h = ending ? r * 0.6 : r * 0.32;
+                      return (
+                        <Path
+                          key={i}
+                          d={`M${-r * 0.17} ${-r + 3}L0 ${-r - h}L${r * 0.17} ${-r + 3}Z`}
+                          fill={ending ? '#E0245E' : '#7B3AA8'}
+                          stroke="#16051F"
+                          strokeWidth={1.5}
+                          strokeLinejoin="round"
+                          transform={`rotate(${(i * 360) / n + 180 / n})`}
+                        />
+                      );
+                    })
+                  : null}
+                <Circle r={r} fill={head} stroke={INK} strokeWidth={2.4} />
+              </G>
+
+              <Face x={cx} y={cy} r={r} mood={mood} form={form} ending={ending} />
+
+              {/* At seed stage the soil sits in front, so it reads as half-buried. */}
+              {level === 1 ? <Path d="M112 306Q150 282 188 306Z" fill="#4A3B2F" /> : null}
+            </G>
+          )}
+        </Svg>
+      </Animated.View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  // Anchor the growth at the soil line (y=300 of 380) rather than the centre.
+  origin: { transformOrigin: '50% 79%' },
+});
+
+/** Sleepy "z"s float beside the head; rendered outside the SVG so they can fade. */
+export function SleepZs({ visible }: { visible: boolean }) {
+  const a = useSharedValue(0);
+  useEffect(() => {
+    cancelAnimation(a);
+    if (visible) {
+      a.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }), -1, true);
+    } else {
+      a.value = withTiming(0, { duration: 200 });
+    }
+  }, [visible, a]);
+
+  const one = useAnimatedStyle(() => ({ opacity: a.value * 0.9, transform: [{ translateY: -a.value * 10 }] }));
+  const two = useAnimatedStyle(() => ({
+    opacity: (1 - a.value) * 0.7,
+    transform: [{ translateY: -(1 - a.value) * 14 }],
+  }));
+
+  if (!visible) return null;
+  return (
+    <View style={zStyles.wrap} pointerEvents="none">
+      <Animated.Text style={[zStyles.z, one]}>z</Animated.Text>
+      <Animated.Text style={[zStyles.z, zStyles.small, two]}>z</Animated.Text>
+    </View>
+  );
+}
+
+const zStyles = StyleSheet.create({
+  wrap: { position: 'absolute', top: '24%', right: '30%', flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  z: { color: '#DCE6FF', fontSize: 22, fontStyle: 'italic', fontWeight: '600' },
+  small: { fontSize: 15 },
+});

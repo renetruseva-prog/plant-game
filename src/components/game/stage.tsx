@@ -15,14 +15,22 @@ import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 import type { Env } from '@/game/types';
 
+/**
+ * What is currently deciding the room's light state:
+ * - `sensor`: Android's real ambient light sensor, in lux.
+ * - `camera`: the camera-brightness fallback (iOS and anywhere without a
+ *   LightSensor), a 0-255 luma read as a rough percentage.
+ * - `manual`: no sensor available at all; the player toggles it by hand.
+ */
+export type LightSource = 'sensor' | 'camera' | 'manual';
+
 type Props = {
   palette: Palette;
   evil: boolean;
   env: Env;
-  /** A real light sensor is driving the room; the badge becomes a read-out. */
-  sensorDriven: boolean;
-  /** Live lux reading while sensor-driven, for the read-out label. */
-  lux: number | null;
+  source: LightSource;
+  /** Live reading for the read-out label: lux for `sensor`, 0-255 luma for `camera`. */
+  reading: number | null;
   onToggleEnv: () => void;
   /** Bumped to shake the whole stage on a rough interaction. */
   shakeKey: number;
@@ -33,12 +41,13 @@ export function Stage({
   palette,
   evil,
   env,
-  sensorDriven,
-  lux,
+  source,
+  reading,
   onToggleEnv,
   shakeKey,
   children,
 }: Props) {
+  const sensorDriven = source !== 'manual';
   const shake = useSharedValue(0);
 
   useEffect(() => {
@@ -89,7 +98,13 @@ export function Stage({
           disabled={sensorDriven}
           accessibilityRole={sensorDriven ? 'text' : 'switch'}
           accessibilityState={sensorDriven ? undefined : { checked: env === 'day' }}
-          accessibilityLabel={sensorDriven ? 'Room light, from the light sensor' : 'Room light'}
+          accessibilityLabel={
+            source === 'sensor'
+              ? 'Room light, from the light sensor'
+              : source === 'camera'
+                ? 'Room light, from the camera'
+                : 'Room light'
+          }
           style={[styles.env, env === 'dark' && styles.envDark]}>
           <Text
             style={[
@@ -97,11 +112,13 @@ export function Stage({
               { fontFamily: family('semibold', false) },
               env === 'dark' && styles.envTextDark,
             ]}>
-            {sensorDriven
-              ? `${env === 'day' ? 'Bright' : 'Dark'} · ${lux !== null ? `${Math.round(lux)} lux` : '…'}`
-              : env === 'day'
-                ? 'Curtains open'
-                : 'Curtains shut'}
+            {source === 'sensor'
+              ? `${env === 'day' ? 'Bright' : 'Dark'} · ${reading !== null ? `${Math.round(reading)} lux` : '…'}`
+              : source === 'camera'
+                ? `${env === 'day' ? 'Bright' : 'Dark'} · ${reading !== null ? `${Math.round((reading / 255) * 100)}%` : '…'} (camera)`
+                : env === 'day'
+                  ? 'Curtains open'
+                  : 'Curtains shut'}
           </Text>
           <View style={[styles.knob, env === 'dark' && styles.knobDark]}>
             <View style={[styles.knobDot, env === 'dark' && styles.knobDotDark]} />

@@ -78,15 +78,32 @@ export const MOTION = {
   nudgeCooldownMs: 4000,
 } as const;
 
-/** Ambient light tuning. */
+/** Ambient light tuning (Android LightSensor - real lux). */
 export const LIGHT = {
-  /** Below this many lux the plant falls asleep (Android LightSensor only). */
+  /** Below this many lux the plant falls asleep. */
   darkLux: 12,
   /** Hysteresis so a flickering sensor doesn't strobe the UI. */
   brightLux: 40,
   intervalMs: 600,
   /** Fallback when there is no sensor: these hours count as dark. */
   nightHours: { from: 20, to: 7 },
+} as const;
+
+/**
+ * Ambient light tuning for the camera-brightness fallback (iOS, or any device
+ * without a LightSensor). There's no public ambient-light API on iOS, so this
+ * samples the camera feed instead and estimates brightness from its average
+ * luma (0-255). Auto-exposure means this is a cruder signal than real lux -
+ * it reliably tells a lit room from a genuinely dark one, but won't resolve
+ * subtle dimming the way a light meter would.
+ */
+export const CAMERA_LIGHT = {
+  intervalMs: 1500,
+  darkLuma: 55,
+  brightLuma: 100,
+  /** Sample every Nth pixel when averaging; keeps the decode cheap. */
+  sampleStride: 4,
+  jpegQuality: 0.3,
 } as const;
 
 /** Location tuning for the "take me outside" interaction. */

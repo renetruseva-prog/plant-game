@@ -12,14 +12,21 @@ export function envFromClock(date = new Date()): Env {
 }
 
 /**
- * Ambient light, with a real fallback rather than a skipped feature.
- *
- * `LightSensor` only exists on Android. Everywhere else the player opens and
- * closes the curtains by hand, seeded from the time of day so the very first
- * frame already matches the room they are sitting in.
+ * `'checking'` until the async availability probe resolves, so a caller
+ * deciding whether to fall back to something else (the camera sampler, the
+ * manual toggle) can wait for a real answer instead of racing a `false` that
+ * only means "haven't checked yet".
+ */
+export type LightSensorStatus = 'checking' | 'available' | 'unavailable';
+
+/**
+ * Real ambient light on Android via `LightSensor`. On iOS - or any device
+ * without one - `status` resolves to `'unavailable'` so the caller can fall
+ * back to something else (see `CameraLightSensor`, then the manual curtains
+ * toggle as the last resort).
  */
 export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => void) {
-  const [hasSensor, setHasSensor] = useState(false);
+  const [status, setStatus] = useState<LightSensorStatus>('checking');
   const [lux, setLux] = useState<number | null>(null);
 
   const onChange = useRef(onEnvChange);
@@ -37,7 +44,7 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
     (async () => {
       const available = await LightSensor.isAvailableAsync().catch(() => false);
       if (cancelled) return;
-      setHasSensor(available);
+      setStatus(available ? 'available' : 'unavailable');
       if (!available) return;
 
       LightSensor.setUpdateInterval(LIGHT.intervalMs);
@@ -60,5 +67,5 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
     };
   }, [enabled]);
 
-  return { hasSensor, lux };
+  return { status, lux };
 }

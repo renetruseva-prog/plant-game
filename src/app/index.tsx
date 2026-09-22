@@ -4,6 +4,7 @@ import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Actions, type TapKind } from '@/components/game/actions';
+import { CameraLightSensor, type CameraLightStatus } from '@/components/game/camera-light-sensor';
 import { DevPanel } from '@/components/game/dev-panel';
 import {
   FakeNotifications,
@@ -256,10 +257,27 @@ export default function GameScreen() {
     onJolt: () => interact('jolt'),
   });
 
-  const { hasSensor, lux } = useAmbientLight(active, (env) => {
-    if (env === state.env) return;
-    interact(env === 'dark' ? 'nightfall' : 'daylight');
-  });
+  const onLightEnv = useCallback(
+    (env: 'day' | 'dark') => {
+      if (env === state.env) return;
+      interact(env === 'dark' ? 'nightfall' : 'daylight');
+    },
+    [state.env, interact]
+  );
+
+  const { status: lightSensorStatus, lux } = useAmbientLight(active, onLightEnv);
+
+  // Only fall back to the camera once we actually know there's no LightSensor
+  // - 'checking' means the async probe hasn't resolved yet, and mounting the
+  // camera (and prompting for its permission) during that window would ask
+  // Android users for a permission the real sensor never needed.
+  const [cameraStatus, setCameraStatus] = useState<CameraLightStatus>('pending');
+  const [cameraLuma, setCameraLuma] = useState<number | null>(null);
+  const cameraEnabled = active && lightSensorStatus === 'unavailable';
+
+  const lightSource: 'sensor' | 'camera' | 'manual' =
+    lightSensorStatus === 'available' ? 'sensor' : cameraStatus === 'active' ? 'camera' : 'manual';
+  const lightReading = lightSource === 'sensor' ? lux : lightSource === 'camera' ? cameraLuma : null;
 
   const { check: checkOutside, busy: outsideBusy } = useOutside();
 
@@ -355,8 +373,8 @@ export default function GameScreen() {
           palette={palette}
           evil={evil}
           env={state.env}
-          sensorDriven={hasSensor}
-          lux={lux}
+          source={lightSource}
+          reading={lightReading}
           onToggleEnv={toggleEnv}
           shakeKey={shakeKey}>
           <Plant
@@ -393,6 +411,13 @@ export default function GameScreen() {
           outsideDone={state.wentOutside}
         />
       </SafeAreaView>
+
+      <CameraLightSensor
+        enabled={cameraEnabled}
+        onEnvChange={onLightEnv}
+        onStatus={setCameraStatus}
+        onBrightness={setCameraLuma}
+      />
 
       <GlitchOverlay active={glitching} />
       <FakeNotifications

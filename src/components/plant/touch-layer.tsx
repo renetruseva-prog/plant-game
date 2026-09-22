@@ -1,7 +1,13 @@
 import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import { cancelAnimation, runOnJS, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
+import {
+  cancelAnimation,
+  runOnJS,
+  useSharedValue,
+  withDelay,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { TOUCH } from '@/game/config';
 import { getPlantGeometry, isOnPlant, toSvgSpace } from '@/game/plant-geometry';
@@ -69,6 +75,12 @@ export function TouchLayer({
    *  so the flinch fires live rather than waiting for the finger to lift,
    *  and `onEnd` doesn't then double-count the same rough slide. */
   const firedAggressive = useSharedValue(false);
+  /** Set once a still hold on the plant has already scored as a stroke, so
+   *  lifting the finger afterwards doesn't score it a second time. */
+  const firedHold = useSharedValue(false);
+  /** A dummy value whose only job is to carry a delayed animation - its
+   *  completion callback is what actually fires the hold-stroke. */
+  const holdTimer = useSharedValue(0);
   /** Counts quick taps in place; decays to 0 on its own if none follow
    *  within the window, via `withDelay` rather than a wall-clock read - a
    *  gesture worklet has no business calling `Date.now()`. */
@@ -98,7 +110,27 @@ export function TouchLayer({
       startY.value = e.y;
       maxVelocity.value = 0;
       firedAggressive.value = false;
-      if (!startOnPlant.value) trackEyesAt(e.x, e.y);
+      firedHold.value = false;
+
+      if (!startOnPlant.value) {
+        trackEyesAt(e.x, e.y);
+        return;
+      }
+
+      // Holding still on the plant scores as a stroke on its own, live,
+      // without waiting for the finger to lift - a long, gentle touch is
+      // exactly the kind of thing that should count as one.
+      cancelAnimation(holdTimer);
+      holdTimer.value = withDelay(
+        TOUCH.holdDurationMs,
+        withTiming(1, { duration: 0 }, (finished) => {
+          'worklet';
+          if (finished && !firedHold.value && !firedAggressive.value) {
+            firedHold.value = true;
+            runOnJS(onStroke)();
+          }
+        })
+      );
     })
     .onUpdate((e) => {
       'worklet';
@@ -111,16 +143,18 @@ export function TouchLayer({
         return;
       }
 
+      const dist = Math.hypot(e.x - startX.value, e.y - startY.value);
+
+      // It's no longer a still hold once it moves enough to be a drag.
+      if (dist >= TOUCH.minDragForVelocity) cancelAnimation(holdTimer);
+
       // A rough slide flinches the moment it's rough, not once the finger
       // finally lifts - it should feel like an immediate reaction.
-      if (!firedAggressive.value) {
-        const dist = Math.hypot(e.x - startX.value, e.y - startY.value);
-        if (dist >= TOUCH.minDragForVelocity && speed >= TOUCH.aggressiveVelocity) {
-          firedAggressive.value = true;
-          cancelAnimation(tapCount);
-          tapCount.value = 0;
-          runOnJS(onShake)();
-        }
+      if (!firedAggressive.value && dist >= TOUCH.minDragForVelocity && speed >= TOUCH.aggressiveVelocity) {
+        firedAggressive.value = true;
+        cancelAnimation(tapCount);
+        tapCount.value = 0;
+        runOnJS(onShake)();
       }
     })
     .onEnd((e) => {
@@ -130,8 +164,9 @@ export function TouchLayer({
         onReleaseEyes();
         return;
       }
-      // Already reacted mid-drag; don't score the same slide twice.
-      if (firedAggressive.value) return;
+      // Already reacted mid-gesture - a hold or a rough slide - so this
+      // release shouldn't score the same touch a second time.
+      if (firedAggressive.value || firedHold.value) return;
 
       const dist = Math.hypot(e.x - startX.value, e.y - startY.value);
       let aggressive = dist >= TOUCH.minDragForVelocity && maxVelocity.value >= TOUCH.aggressiveVelocity;
@@ -152,6 +187,13 @@ export function TouchLayer({
 
       if (aggressive) runOnJS(onShake)();
       else runOnJS(onStroke)();
+    })
+    // Fires for every way the gesture can conclude - a clean release, a
+    // failure, or being pre-empted by the pinch winning the race - so the
+    // hold timer can never keep ticking past a touch that's already over.
+    .onFinalize(() => {
+      'worklet';
+      cancelAnimation(holdTimer);
     });
 
   const pinch = Gesture.Pinch()

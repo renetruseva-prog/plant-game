@@ -153,9 +153,9 @@ export const TOUCH = {
 /**
  * Turning the phone upside down - rotated 180°, the way you'd hold an
  * upside-down book, screen still facing you but inverted - drops the plant
- * out of its pot for good. Detected via `DeviceMotion`'s OS-computed screen
- * orientation rather than a raw accelerometer sign, so it doesn't depend on
- * guessing which sign means "upright" on a given platform.
+ * out of its pot for good. Detected from the accelerometer's own gravity
+ * reading (see `use-upside-down.ts`) rather than DeviceMotion's interface
+ * orientation, which never reports upside-down in a portrait-locked app.
  */
 export const FALL = {
   /** Must stay upside down this long before it counts - a brief fumble

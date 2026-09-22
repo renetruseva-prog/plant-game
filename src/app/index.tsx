@@ -282,7 +282,7 @@ export default function GameScreen() {
     runFinale('fell');
   }, [state.started, state.ending, runFinale]);
 
-  useUpsideDown(active, onFall);
+  const { fallAngle } = useUpsideDown(active, onFall);
 
   /* ---------------- device interactions ---------------- */
 
@@ -431,6 +431,7 @@ export default function GameScreen() {
             tilt={tilt}
             eyeX={eyeX}
             eyeY={eyeY}
+            fallAngle={fallAngle}
           />
           <SleepZs visible={displayMood === 'sleep'} />
           <Particles burst={burst} />

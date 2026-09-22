@@ -5,6 +5,7 @@ import Animated, {
   cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withSpring,
   withTiming,
@@ -21,6 +22,7 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
+import { FALL } from '@/game/config';
 import { getPlantGeometry, VIEW_H, VIEW_W } from '@/game/plant-geometry';
 import type { EndingKind, Mood } from '@/game/types';
 
@@ -57,14 +59,33 @@ type Props = {
   /** Live pupil offset while a finger drags elsewhere on the stage. */
   eyeX: SharedValue<number>;
   eyeY: SharedValue<number>;
+  /** Live rotation (degrees, signed, roughly ±180) as the phone turns - see
+   *  `useUpsideDown`. Lets the plant visibly follow the gesture in real
+   *  time, rather than only reacting once the fall is already decided. */
+  fallAngle?: SharedValue<number>;
 };
 
-export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey, tilt, eyeX, eyeY }: Props) {
+export function Plant({
+  level,
+  mood,
+  form,
+  ending,
+  roughRatio,
+  popKey,
+  pinchKey,
+  tilt,
+  eyeX,
+  eyeY,
+  fallAngle,
+}: Props) {
   const breathe = useSharedValue(0);
   const sway = useSharedValue(0);
   const jitter = useSharedValue(0);
   const pop = useSharedValue(1);
   const squish = useSharedValue(1);
+  /** 0 = normal/alive, 1 = fully showing the toppled scene. Animates the
+   *  crossfade between them once the fall is confirmed. */
+  const fellReveal = useSharedValue(0);
 
   // One looping driver per mood; the unused ones are parked at 0 so the styles
   // below can simply sum their contributions.
@@ -129,20 +150,58 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
     squish.value = withSpring(1, { damping: 5, stiffness: 260, mass: 0.5 });
   }, [pinchKey, squish]);
 
+  // Reveals the fallen scene once the ending actually locks in, fading the
+  // live plant out as the toppled one fades in underneath. Skipped on a
+  // fresh mount that's already fallen (a restored, already-finished run) -
+  // there's nothing to animate into, and reset instantly on a new specimen.
+  const settledFall = useRef(false);
+  useEffect(() => {
+    if (!settledFall.current) {
+      settledFall.current = true;
+      fellReveal.value = ending === 'fell' ? 1 : 0;
+      return;
+    }
+    if (ending === 'fell') {
+      fellReveal.value = withDelay(
+        FALL.revealDelayMs,
+        withTiming(1, { duration: FALL.revealDurationMs, easing: Easing.out(Easing.quad) })
+      );
+    } else {
+      fellReveal.value = 0;
+    }
+  }, [ending, fellReveal]);
+
   const style = useAnimatedStyle(() => {
     const swayDeg = (sway.value * 2 - 1) * 3.5;
     const jitterDeg = (jitter.value * 2 - 1) * 2;
     const jitterX = (jitter.value * 2 - 1) * 3;
     const leanDeg = (tilt?.value ?? 0) * 3;
+
+    // Ordinary handling shifts the phone's angle constantly; only a real,
+    // deliberate turn beyond the deadzone should visibly tip the plant, and
+    // it should track the rest of that turn directly, 1:1.
+    const raw = fallAngle?.value ?? 0;
+    const fallDeg = Math.sign(raw) * Math.max(0, Math.abs(raw) - FALL.deadzoneDeg);
+
+    // Once it's actually fallen, keep drooping and dropping a little further
+    // as the toppled scene fades in, rather than freezing mid-motion.
+    const dropDeg = fellReveal.value * 22;
+    const dropY = fellReveal.value * 34;
+
     return {
+      opacity: 1 - fellReveal.value,
       transform: [
         { translateX: jitterX },
-        { rotate: `${swayDeg + jitterDeg + leanDeg}deg` },
+        { translateY: dropY },
+        { rotate: `${swayDeg + jitterDeg + leanDeg + fallDeg + dropDeg}deg` },
         { scaleX: pop.value * squish.value * (1 + breathe.value * 0.015) },
         { scaleY: pop.value * (2 - squish.value) * (1 + breathe.value * 0.03) },
       ],
     };
   });
+
+  const potFadeStyle = useAnimatedStyle(() => ({ opacity: 1 - fellReveal.value }));
+  const fellFadeStyle = useAnimatedStyle(() => ({ opacity: fellReveal.value }));
 
   const { cx, cy, r, stemH } = getPlantGeometry(level, form, ending);
 
@@ -200,10 +259,27 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {/* Static pot and shadow: they must not breathe with the plant. */}
-      <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
-        {ending === 'fell' ? (
-          <G>
+      {/* Upright pot: visible through normal play, and still through a live
+          upside-down gesture (it hasn't tipped yet, only the plant is
+          leaning) - fades out once it's actually fallen. */}
+      <Animated.View style={[StyleSheet.absoluteFill, potFadeStyle]}>
+        <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
+          <Ellipse cx={150} cy={370} rx={76} ry={7} fill="rgba(0,0,0,0.16)" />
+          <Path
+            d="M94 306h112l-11 62h-90z"
+            fill="#F4F6F0"
+            stroke={INK}
+            strokeWidth={2.4}
+            strokeLinejoin="round"
+          />
+          <Rect x={88} y={298} width={124} height={14} rx={6} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
+          <Ellipse cx={150} cy={300} rx={58} ry={7} fill="#4A3B2F" />
+        </Svg>
+      </Animated.View>
+
+      {ending === 'fell' ? (
+        <Animated.View style={[StyleSheet.absoluteFill, fellFadeStyle]}>
+          <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
             {/* Knocked on its side, the soil pouring out and across the shelf. */}
             <Ellipse cx={150} cy={372} rx={92} ry={8} fill="rgba(0,0,0,0.14)" />
             <G transform="rotate(-12 95 320)">
@@ -215,22 +291,9 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
             <Ellipse cx={236} cy={336} rx={28} ry={10} fill="#4A3B2F" opacity={0.85} />
             <Ellipse cx={212} cy={318} rx={9} ry={6} fill="#3A2E22" opacity={0.7} />
             <Ellipse cx={246} cy={328} rx={7} ry={5} fill="#3A2E22" opacity={0.6} />
-          </G>
-        ) : (
-          <G>
-            <Ellipse cx={150} cy={370} rx={76} ry={7} fill="rgba(0,0,0,0.16)" />
-            <Path
-              d="M94 306h112l-11 62h-90z"
-              fill="#F4F6F0"
-              stroke={INK}
-              strokeWidth={2.4}
-              strokeLinejoin="round"
-            />
-            <Rect x={88} y={298} width={124} height={14} rx={6} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
-            <Ellipse cx={150} cy={300} rx={58} ry={7} fill="#4A3B2F" />
-          </G>
-        )}
-      </Svg>
+          </Svg>
+        </Animated.View>
+      ) : null}
 
       <Animated.View style={[StyleSheet.absoluteFill, styles.origin, style]}>
         <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
@@ -243,44 +306,7 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
 
           {ending === 'bad' ? <Circle cx={cx} cy={cy} r={r * 2.6} fill="url(#redglow)" /> : null}
 
-          {ending === 'fell' ? (
-            <G>
-              {/* Slumped in the spilled soil: a short wilted stem, a head
-                  resting on its side. Not animated - see the mood effect. */}
-              <Path
-                d="M165 306Q185 330 205 340Q215 344 220 336"
-                stroke={INK}
-                strokeWidth={9}
-                fill="none"
-                strokeLinecap="round"
-              />
-              <Path
-                d="M165 306Q185 330 205 340Q215 344 220 336"
-                stroke="#6B5A3A"
-                strokeWidth={5}
-                fill="none"
-                strokeLinecap="round"
-              />
-              <Path
-                d={leafPath(28)}
-                fill="#7A6A46"
-                stroke={INK}
-                strokeWidth={1.6}
-                strokeLinejoin="round"
-                transform="translate(192 335) rotate(150)"
-              />
-              <Path
-                d={leafPath(24)}
-                fill="#7A6A46"
-                stroke={INK}
-                strokeWidth={1.6}
-                strokeLinejoin="round"
-                transform="translate(178 320) rotate(210) scale(-1,1)"
-              />
-              <Circle cx={230} cy={330} r={r} fill={head} stroke={INK} strokeWidth={2.4} />
-              <Face x={230} y={330} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
-            </G>
-          ) : ending === 'neutral' ? (
+          {ending === 'neutral' ? (
             <G>
               {/* Ordinary grass: a flat tuft of blades, no stem at all. */}
               {(
@@ -401,6 +427,47 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
           )}
         </Svg>
       </Animated.View>
+
+      {ending === 'fell' ? (
+        <Animated.View style={[StyleSheet.absoluteFill, fellFadeStyle]}>
+          <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
+            {/* Slumped in the spilled soil: a short wilted stem, a head
+                resting on its side. Not animated - it's already landed. */}
+            <Path
+              d="M165 306Q185 330 205 340Q215 344 220 336"
+              stroke={INK}
+              strokeWidth={9}
+              fill="none"
+              strokeLinecap="round"
+            />
+            <Path
+              d="M165 306Q185 330 205 340Q215 344 220 336"
+              stroke="#6B5A3A"
+              strokeWidth={5}
+              fill="none"
+              strokeLinecap="round"
+            />
+            <Path
+              d={leafPath(28)}
+              fill="#7A6A46"
+              stroke={INK}
+              strokeWidth={1.6}
+              strokeLinejoin="round"
+              transform="translate(192 335) rotate(150)"
+            />
+            <Path
+              d={leafPath(24)}
+              fill="#7A6A46"
+              stroke={INK}
+              strokeWidth={1.6}
+              strokeLinejoin="round"
+              transform="translate(178 320) rotate(210) scale(-1,1)"
+            />
+            <Circle cx={230} cy={330} r={r} fill={head} stroke={INK} strokeWidth={2.4} />
+            <Face x={230} y={330} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
+          </Svg>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

@@ -158,9 +158,21 @@ export const TOUCH = {
  * orientation, which never reports upside-down in a portrait-locked app.
  */
 export const FALL = {
-  /** Must stay upside down this long before it counts - a brief fumble
+  /** Degrees of rotation from the starting orientation that counts as
+   *  "upside down" - not quite the full 180° to leave some tolerance. */
+  angleThreshold: 140,
+  /** Must stay past that angle this long before it counts - a brief fumble
    *  mid-handoff shouldn't permanently end the run. */
   holdMs: 900,
+  /**
+   * Below this many degrees of live rotation, the plant doesn't visibly
+   * react at all - ordinary handling shifts the phone's angle constantly,
+   * and only a real, deliberate turn should show up as the plant tipping.
+   */
+  deadzoneDeg: 25,
+  /** How long the reveal of the fallen scene takes once triggered. */
+  revealDelayMs: 280,
+  revealDurationMs: 420,
 } as const;
 
 export function levelFor(count: number): number {

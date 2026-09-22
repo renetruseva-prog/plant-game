@@ -143,7 +143,7 @@ export const TOUCH = {
   rapidTapCount: 2,
   rapidTapWindowMs: 700,
   /** Holding a finger still on the plant this long counts as a stroke, live. */
-  holdDurationMs: 2000,
+  holdDurationMs: 1200,
   /** How far the pupils drift while tracking a finger elsewhere on the stage. */
   eyeMaxOffset: 3.6,
   eyeFollowDuration: 90,

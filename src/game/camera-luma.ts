@@ -31,3 +31,14 @@ export function averageLumaFromBase64Jpeg(base64: string): number | null {
     return null;
   }
 }
+
+/**
+ * The median of the last few readings, not their average - a brief spike
+ * (motion blur, a hand crossing the lens as the phone is set down) is an
+ * outlier a median shrugs off, where an average would still drag toward it.
+ */
+export function medianOf(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}

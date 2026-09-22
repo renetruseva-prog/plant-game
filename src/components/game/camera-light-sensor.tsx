@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { CAMERA_LIGHT } from '@/game/config';
-import { averageLumaFromBase64Jpeg } from '@/game/camera-luma';
+import { averageLumaFromBase64Jpeg, medianOf } from '@/game/camera-luma';
 import type { Env } from '@/game/types';
 
 export type CameraLightStatus = 'pending' | 'active' | 'unavailable';
@@ -29,6 +29,11 @@ type Props = {
  * The `CameraView` is mounted at 2x2px and fully transparent: large enough
  * that camera implementations reliably keep delivering frames, small enough
  * to be invisible in the UI.
+ *
+ * Uses the **front** camera specifically: when a phone is set down the
+ * ordinary way (screen up), the front camera looks up at the room, while the
+ * back camera looks down into the table and reads its surface instead of the
+ * room's light - a wrong reading, not an imprecise one.
  */
 export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
@@ -39,6 +44,10 @@ export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness
   const lastEnv = useRef<Env | null>(null);
   const sizedRef = useRef(false);
   const requestedRef = useRef(false);
+  /** Last few readings, so one blurry or transiently-occluded frame - the
+   *  phone mid-motion while being set down, a hand passing over the lens -
+   *  can't flip the room state on its own. */
+  const recentLumas = useRef<number[]>([]);
 
   const onEnvChangeRef = useRef(onEnvChange);
   const onStatusRef = useRef(onStatus);
@@ -115,8 +124,15 @@ export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness
         if (luma === null) return;
         onBrightnessRef.current(luma);
 
+        recentLumas.current = [...recentLumas.current, luma].slice(-CAMERA_LIGHT.smoothingWindow);
+        const smoothed = medianOf(recentLumas.current);
+
         const next: Env | null =
-          luma <= CAMERA_LIGHT.darkLuma ? 'dark' : luma >= CAMERA_LIGHT.brightLuma ? 'day' : null;
+          smoothed <= CAMERA_LIGHT.darkLuma
+            ? 'dark'
+            : smoothed >= CAMERA_LIGHT.brightLuma
+              ? 'day'
+              : null;
         if (next && next !== lastEnv.current) {
           lastEnv.current = next;
           onEnvChangeRef.current(next);
@@ -139,7 +155,7 @@ export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness
       <CameraView
         ref={cameraRef}
         style={styles.camera}
-        facing="back"
+        facing="front"
         pictureSize={pictureSize}
         onCameraReady={() => setReady(true)}
       />

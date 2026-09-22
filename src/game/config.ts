@@ -104,6 +104,12 @@ export const CAMERA_LIGHT = {
   /** Sample every Nth pixel when averaging; keeps the decode cheap. */
   sampleStride: 4,
   jpegQuality: 0.3,
+  /**
+   * The env decision uses the median of this many recent readings rather
+   * than the latest one, so a single transient frame (motion blur, a hand
+   * crossing the lens) can't flip the room by itself.
+   */
+  smoothingWindow: 3,
 } as const;
 
 /** Location tuning for the "take me outside" interaction. */

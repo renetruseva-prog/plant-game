@@ -124,8 +124,12 @@ export const OUTSIDE = {
 
 /** Touching the plant directly, on top of the button row and phone shaking. */
 export const TOUCH = {
-  /** A drag faster than this (px/s) anywhere during the touch reads as aggressive. */
-  aggressiveVelocity: 900,
+  /**
+   * A drag faster than this (px/s) anywhere during the touch reads as
+   * aggressive. Tuned to catch an ordinary brisk side-to-side slide, not
+   * only an extreme flick - it fires live, mid-drag, the moment it's crossed.
+   */
+  aggressiveVelocity: 500,
   /**
    * Below this total distance, velocity is ignored - a firm press-and-hold or
    * a tiny flick shouldn't misclassify as a shake from sensor noise alone.

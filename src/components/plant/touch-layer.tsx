@@ -65,6 +65,10 @@ export function TouchLayer({
   const startOnPlant = useSharedValue(false);
   const maxVelocity = useSharedValue(0);
   const pinchOnPlant = useSharedValue(false);
+  /** Set the instant a drag on the plant crosses the aggressive threshold,
+   *  so the flinch fires live rather than waiting for the finger to lift,
+   *  and `onEnd` doesn't then double-count the same rough slide. */
+  const firedAggressive = useSharedValue(false);
   /** Counts quick taps in place; decays to 0 on its own if none follow
    *  within the window, via `withDelay` rather than a wall-clock read - a
    *  gesture worklet has no business calling `Date.now()`. */
@@ -93,6 +97,7 @@ export function TouchLayer({
       startX.value = e.x;
       startY.value = e.y;
       maxVelocity.value = 0;
+      firedAggressive.value = false;
       if (!startOnPlant.value) trackEyesAt(e.x, e.y);
     })
     .onUpdate((e) => {
@@ -100,7 +105,23 @@ export function TouchLayer({
       if (disabledRef.value) return;
       const speed = Math.hypot(e.velocityX, e.velocityY);
       if (speed > maxVelocity.value) maxVelocity.value = speed;
-      if (!startOnPlant.value) trackEyesAt(e.x, e.y);
+
+      if (!startOnPlant.value) {
+        trackEyesAt(e.x, e.y);
+        return;
+      }
+
+      // A rough slide flinches the moment it's rough, not once the finger
+      // finally lifts - it should feel like an immediate reaction.
+      if (!firedAggressive.value) {
+        const dist = Math.hypot(e.x - startX.value, e.y - startY.value);
+        if (dist >= TOUCH.minDragForVelocity && speed >= TOUCH.aggressiveVelocity) {
+          firedAggressive.value = true;
+          cancelAnimation(tapCount);
+          tapCount.value = 0;
+          runOnJS(onShake)();
+        }
+      }
     })
     .onEnd((e) => {
       'worklet';
@@ -109,6 +130,8 @@ export function TouchLayer({
         onReleaseEyes();
         return;
       }
+      // Already reacted mid-drag; don't score the same slide twice.
+      if (firedAggressive.value) return;
 
       const dist = Math.hypot(e.x - startX.value, e.y - startY.value);
       let aggressive = dist >= TOUCH.minDragForVelocity && maxVelocity.value >= TOUCH.aggressiveVelocity;

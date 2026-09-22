@@ -179,9 +179,13 @@ export default function GameScreen() {
       }
 
       if (kind !== 'bad') {
-        setWhisper(
-          kind === 'good' ? 'It opens up, petal by petal.' : 'It flattens out into a quiet tuft.'
-        );
+        const reveal: Record<Exclude<EndingKind, 'bad' | 'fell'>, string> = {
+          good: 'It opens up, petal by petal.',
+          neutral: 'It flattens out into a quiet tuft.',
+          carnivore: 'Its leaves fold shut around something.',
+          cactus: 'It draws in, thickens, toughens up.',
+        };
+        setWhisper(reveal[kind]);
         if (kind === 'good') {
           burstId.current += 1;
           setBurst({ id: burstId.current, kind: 'petal', count: 14 });

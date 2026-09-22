@@ -52,12 +52,36 @@ export const ENDING_RULES = {
    * the plant should feel generous, not fragile.
    */
   good: { maxRoughness: 108, care: 108, attention: 108, light: 87 },
+  /**
+   * Watered and sunned diligently, but barely touched: it stops waiting for
+   * affection and starts catching its own. Judged by ratio rather than a
+   * flat cap - `attention` relative to `care + light` - so it scales with
+   * however many interactions actually happened, and still catches "a
+   * little" affection sneaking in without catching a genuinely balanced run
+   * that happens to lean on walk/outside more than deliberate stroking.
+   * `minCareLight` sits well above what care alone could reach from
+   * sun-only incidental care (every sun tap carries +1), so sunlight
+   * without any real watering doesn't get mistaken for both.
+   */
+  carnivore: { minCareLight: 250, maxAttentionRatio: 0.22, maxRoughness: 110 },
+  /**
+   * Plenty of light and touch, but almost never watered: it toughens up and
+   * stops needing to be. Same ratio idea, mirrored - `care` relative to
+   * `light + attention`.
+   */
+  cactus: { minLightAttention: 180, maxCareRatio: 0.27, maxRoughness: 110 },
 } as const;
 
-/** Softer version of the same rules, used at level 4 to foreshadow the ending. */
+/**
+ * Softer version of the same rules, used at level 4 to foreshadow the
+ * ending. The ratio thresholds don't need rescaling - a ratio already
+ * doesn't care how many interactions happened - only the absolute floors do.
+ */
 export const TENDENCY_RULES = {
   badRoughness: 95,
   good: { maxRoughness: 40, care: 40, attention: 40, light: 32 },
+  carnivore: { minCareLight: 125, maxAttentionRatio: 0.22, maxRoughness: 55 },
+  cactus: { minLightAttention: 90, maxCareRatio: 0.27, maxRoughness: 55 },
 } as const;
 
 /** Motion detection tuning (accelerometer magnitude is in g, ~1.0 at rest). */
@@ -195,11 +219,28 @@ export function applyWeights(scores: Scores, kind: InteractionKind): Scores {
 
 const gentleTotal = (s: Scores) => s.care + s.light + s.attention;
 
+type CarnivoreRules = { minCareLight: number; maxAttentionRatio: number; maxRoughness: number };
+type CactusRules = { minLightAttention: number; maxCareRatio: number; maxRoughness: number };
+
+const isCarnivore = (s: Scores, rules: CarnivoreRules) =>
+  s.care >= rules.minCareLight &&
+  s.light >= rules.minCareLight &&
+  s.roughness <= rules.maxRoughness &&
+  s.attention <= (s.care + s.light) * rules.maxAttentionRatio;
+
+const isCactus = (s: Scores, rules: CactusRules) =>
+  s.light >= rules.minLightAttention &&
+  s.attention >= rules.minLightAttention &&
+  s.roughness <= rules.maxRoughness &&
+  s.care <= (s.light + s.attention) * rules.maxCareRatio;
+
 /** The final verdict. Computed once, at level 5. */
 export function endingOf(s: Scores): EndingKind {
-  const { badRoughness, badMixed, good } = ENDING_RULES;
+  const { badRoughness, badMixed, good, carnivore, cactus } = ENDING_RULES;
   if (s.roughness >= badRoughness) return 'bad';
   if (s.roughness >= badMixed.roughness && gentleTotal(s) <= badMixed.maxGentle) return 'bad';
+  if (isCarnivore(s, carnivore)) return 'carnivore';
+  if (isCactus(s, cactus)) return 'cactus';
   if (
     s.roughness <= good.maxRoughness &&
     s.care >= good.care &&
@@ -213,8 +254,10 @@ export function endingOf(s: Scores): EndingKind {
 
 /** Where the plant is currently heading, shown from level 4 so you can course-correct. */
 export function tendencyOf(s: Scores): EndingKind {
-  const { badRoughness, good } = TENDENCY_RULES;
+  const { badRoughness, good, carnivore, cactus } = TENDENCY_RULES;
   if (s.roughness >= badRoughness) return 'bad';
+  if (isCarnivore(s, carnivore)) return 'carnivore';
+  if (isCactus(s, cactus)) return 'cactus';
   if (
     s.roughness <= good.maxRoughness &&
     s.care >= good.care &&

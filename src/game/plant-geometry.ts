@@ -27,10 +27,21 @@ export function getPlantGeometry(
   'worklet';
   const lv = Math.min(Math.max(level, 1), 5);
   const stemH = STEM_H[lv];
-  const r = ending === 'good' ? 26 : ending === 'bad' ? 36 : HEAD_R[lv];
+  const r =
+    ending === 'good'
+      ? 26
+      : ending === 'bad'
+        ? 36
+        : ending === 'carnivore'
+          ? 30
+          : ending === 'cactus'
+            ? 28
+            : HEAD_R[lv];
   const lean = form === 'bad' ? 12 : 0;
   const cx = 150 + lean;
-  const cy = lv === 1 ? 292 : 300 - stemH;
+  // The cactus ending replaces the stem entirely with a single tall body, so
+  // its face sits mid-barrel rather than wherever the normal stem would end.
+  const cy = ending === 'cactus' ? 235 : lv === 1 ? 292 : 300 - stemH;
   return { cx, cy, r, stemH };
 }
 

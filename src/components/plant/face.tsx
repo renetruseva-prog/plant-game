@@ -104,6 +104,56 @@ export function Face({ x, y, r, mood, form, ending, eyeX, eyeY }: Props) {
     );
   }
 
+  if (ending === 'carnivore') {
+    // Sly, asymmetric eyes and a crooked, toothy grin - mischievous, not evil.
+    return (
+      <G>
+        <Path
+          d={`M${x - dx - er * 1.3} ${ey - er * 0.2}Q${x - dx} ${ey - er * 1.3} ${x - dx + er * 1.3} ${ey - er * 0.2}`}
+          fill="none"
+          {...line}
+        />
+        <Path
+          d={`M${x + dx - er * 1.1} ${ey + er * 0.3}Q${x + dx} ${ey - er * 0.5} ${x + dx + er * 1.1} ${ey + er * 0.3}`}
+          fill="none"
+          {...line}
+        />
+        <Path
+          d={`M${x - r * 0.3} ${y + r * 0.22}Q${x} ${y + r * 0.5} ${x + r * 0.36} ${y + r * 0.1}`}
+          fill="none"
+          {...line}
+        />
+        <Path
+          d={`M${x + r * 0.08} ${y + r * 0.28}L${x + r * 0.14} ${y + r * 0.42}L${x + r * 0.2} ${y + r * 0.27}Z`}
+          fill={stroke}
+        />
+      </G>
+    );
+  }
+
+  if (ending === 'cactus') {
+    // Closed, content eyes and a small settled smile - hardy, not sad.
+    return (
+      <G>
+        {[-1, 1].map((s) => (
+          <Path
+            key={s}
+            d={`M${x + s * dx - er * 1.3} ${ey}Q${x + s * dx} ${ey - er * 1.4} ${
+              x + s * dx + er * 1.3
+            } ${ey}`}
+            fill="none"
+            {...line}
+          />
+        ))}
+        <Path
+          d={`M${x - r * 0.22} ${y + r * 0.22}Q${x} ${y + r * 0.4} ${x + r * 0.22} ${y + r * 0.22}`}
+          fill="none"
+          {...line}
+        />
+      </G>
+    );
+  }
+
   if (mood === 'sleep') {
     return (
       <G>

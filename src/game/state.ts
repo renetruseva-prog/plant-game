@@ -104,6 +104,8 @@ export function reducer(state: GameState, action: Action): GameState {
         neutral: ['water', 'water', 'stroke'],
         bad: ['shake', 'shake', 'water'],
         fell: ['water', 'stroke', 'sun'],
+        carnivore: ['water', 'sun'],
+        cactus: ['sun', 'stroke'],
       };
       const plan = plans[action.ending];
       let s: GameState = { ...freshState(), started: true };

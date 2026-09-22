@@ -74,6 +74,18 @@ export function hapticEnding(kind: EndingKind) {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     });
   }
+  if (kind === 'carnivore') {
+    // A quick, playful snap - like a trap closing.
+    return run(async () => {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
+      await sleep(60);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid);
+    });
+  }
+  if (kind === 'cactus') {
+    // One firm, settled thump - hardy, not excitable.
+    return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
+  }
   return run(() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning));
 }
 

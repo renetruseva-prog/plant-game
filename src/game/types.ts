@@ -1,9 +1,12 @@
 /**
- * `'fell'` is not a scored ending - it's an instant, permanent one triggered
- * by turning the phone upside down mid-run (see `use-upside-down.ts`), and
- * bypasses the normal Level 5 reveal entirely.
+ * `'carnivore'` (all water and light, barely any affection) and `'cactus'`
+ * (light and affection, barely any water) are scored endings alongside
+ * good/neutral/bad - see `endingOf`. `'fell'` is not scored at all - it's an
+ * instant, permanent ending triggered by turning the phone upside down
+ * mid-run (see `use-upside-down.ts`), and bypasses the Level 5 reveal
+ * entirely.
  */
-export type EndingKind = 'good' | 'neutral' | 'bad' | 'fell';
+export type EndingKind = 'good' | 'neutral' | 'bad' | 'fell' | 'carnivore' | 'cactus';
 
 /** Tap interactions plus the device-driven ones. */
 export type InteractionKind =

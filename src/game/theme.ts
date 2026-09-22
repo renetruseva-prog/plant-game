@@ -90,6 +90,8 @@ const TENDENCY_TINT: Record<EndingKind, Partial<Palette>> = {
   good: { accent: '#E8B33A', stageTop: '#DCE9C8', stageBottom: '#F6F6E4' },
   neutral: {},
   bad: { accent: '#7B3AA8', stageTop: '#B9C6D4', stageBottom: '#DCD8E8', dim: '#5A5269' },
+  carnivore: { accent: '#E0483E', stageTop: '#A9D48E', stageBottom: '#DCEED0' },
+  cactus: { accent: '#C98B4A', stageTop: '#E9DBB4', stageBottom: '#F7F0DD' },
   // Falling is instant, never foreshadowed - this tint is never actually
   // looked up, but the record needs an entry for every EndingKind.
   fell: {},
@@ -122,6 +124,34 @@ export const FALL_PALETTE: Palette = {
   tracking: 0,
 };
 
+/** Vivid jungle green with a toothy red accent - mischievous, not sinister. */
+export const CARNIVORE_PALETTE: Palette = {
+  screen: '#E7F2E0',
+  paper: '#FAFDF6',
+  ink: '#16251B',
+  dim: '#4F6A54',
+  line: 'rgba(22,37,27,0.2)',
+  accent: '#E0483E',
+  stageTop: '#8FC46A',
+  stageBottom: '#2E5C2A',
+  radius: 20,
+  tracking: -0.3,
+};
+
+/** Warm and sandy - it stopped needing much, and the room reflects that. */
+export const CACTUS_PALETTE: Palette = {
+  screen: '#F3EAD9',
+  paper: '#FBF6EC',
+  ink: '#3B3226',
+  dim: '#8A7A5F',
+  line: 'rgba(59,50,38,0.18)',
+  accent: '#B5652F',
+  stageTop: '#F0DCAE',
+  stageBottom: '#E3C688',
+  radius: 14,
+  tracking: -0.2,
+};
+
 const DARK_STAGE = { stageTop: '#1A2644', stageBottom: '#0D1526' };
 
 export function paletteFor(
@@ -132,6 +162,8 @@ export function paletteFor(
 ): Palette {
   if (ending === 'bad') return EVIL_PALETTE;
   if (ending === 'fell') return FALL_PALETTE;
+  if (ending === 'carnivore') return CARNIVORE_PALETTE;
+  if (ending === 'cactus') return CACTUS_PALETTE;
 
   let p = { ...BY_LEVEL[Math.min(level, 5) - 1] };
   if (level >= 4 && tendency) p = { ...p, ...TENDENCY_TINT[tendency] };

@@ -216,7 +216,11 @@ export function Plant({
             ? '#F6C945'
             : ending === 'neutral'
               ? '#8DBF6A'
-              : mix('#86CF74', '#6D4C93', Math.min(1, roughRatio * 2.2));
+              : ending === 'carnivore'
+                ? '#4A9A4E'
+                : ending === 'cactus'
+                  ? '#5FA05E'
+                  : mix('#86CF74', '#6D4C93', Math.min(1, roughRatio * 2.2));
   if (form === 'bad' && !ending) head = mix(head, '#3A1858', 0.5);
 
   const stemC = ending === 'bad' ? '#3B1D57' : '#3E9B57';
@@ -306,7 +310,59 @@ export function Plant({
 
           {ending === 'bad' ? <Circle cx={cx} cy={cy} r={r * 2.6} fill="url(#redglow)" /> : null}
 
-          {ending === 'neutral' ? (
+          {ending === 'cactus' ? (
+            <G>
+              {/* No stem, no leaves - a single tall ribbed body instead. */}
+              <Path
+                d="M112 306L112 200Q112 160 150 160Q188 160 188 200L188 306Z"
+                fill={head}
+                stroke={INK}
+                strokeWidth={2.4}
+                strokeLinejoin="round"
+              />
+              <Path d="M130 304Q126 240 130 168" stroke={INK} strokeWidth={1.3} fill="none" opacity={0.3} />
+              <Path d="M150 304L150 163" stroke={INK} strokeWidth={1.3} fill="none" opacity={0.3} />
+              <Path d="M170 304Q174 240 170 168" stroke={INK} strokeWidth={1.3} fill="none" opacity={0.3} />
+              {Array.from({ length: 9 }, (_, i) => {
+                const t = i / 8;
+                const yy = 300 - t * 132;
+                const taper = 38 * (1 - t * 0.42);
+                return (
+                  <G key={i}>
+                    <Path
+                      d={`M${150 - taper} ${yy}l-6 -3`}
+                      stroke="#F4EBD0"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
+                    />
+                    <Path
+                      d={`M${150 + taper} ${yy}l6 -3`}
+                      stroke="#F4EBD0"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
+                    />
+                  </G>
+                );
+              })}
+              <G transform="translate(150 162)">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <Ellipse
+                    key={i}
+                    cx={0}
+                    cy={-6}
+                    rx={4.2}
+                    ry={7.5}
+                    fill="#E8618C"
+                    stroke={INK}
+                    strokeWidth={1}
+                    transform={`rotate(${i * 60})`}
+                  />
+                ))}
+                <Circle r={3} fill="#F6C945" />
+              </G>
+              <Face x={cx} y={cy} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
+            </G>
+          ) : ending === 'neutral' ? (
             <G>
               {/* Ordinary grass: a flat tuft of blades, no stem at all. */}
               {(
@@ -374,6 +430,19 @@ export function Plant({
                         />
                       ))
                     : null}
+                  {level === 4 && form === 'cactus'
+                    ? [-1, 1].flatMap((s) =>
+                        [0, 1, 2].map((i) => (
+                          <Path
+                            key={`sp${s}-${i}`}
+                            d={`M${cx + s * (r + 4 + i * 6)} ${cy - 6 + i * 10}l${s * 5} -2`}
+                            stroke="#F4EBD0"
+                            strokeWidth={1.4}
+                            strokeLinecap="round"
+                          />
+                        ))
+                      )
+                    : null}
                 </G>
               ) : null}
 
@@ -416,10 +485,66 @@ export function Plant({
                       );
                     })
                   : null}
+                {form === 'carnivore' && level >= 4
+                  ? [-1, 1].map((s) => (
+                      <G key={s} transform={`rotate(${s * 40})`}>
+                        <Ellipse
+                          cx={0}
+                          cy={-(r * (ending ? 1.5 : 1.1))}
+                          rx={r * (ending ? 0.78 : 0.4)}
+                          ry={r * (ending ? 1.05 : 0.55)}
+                          fill="#D94A3E"
+                          stroke={INK}
+                          strokeWidth={1.8}
+                        />
+                        {ending
+                          ? [-1.5, -0.5, 0.5, 1.5].map((i) => (
+                              <Path
+                                key={i}
+                                d={`M${i * r * 0.2} ${-r * 0.55}L${i * r * 0.2 + r * 0.05} ${-r * 0.85}L${
+                                  i * r * 0.2 + r * 0.1
+                                } ${-r * 0.55}Z`}
+                                fill="#FBEDE9"
+                              />
+                            ))
+                          : null}
+                      </G>
+                    ))
+                  : null}
                 <Circle r={r} fill={head} stroke={INK} strokeWidth={2.4} />
               </G>
 
               <Face x={cx} y={cy} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
+
+              {ending === 'carnivore' ? (
+                <G>
+                  {/* Flies, buzzing near the trap. */}
+                  <Circle cx={cx + r * 1.7} cy={cy - r * 1.9} r={2.6} fill="#2B2B2B" />
+                  <Path
+                    d={`M${cx + r * 1.7 - 4} ${cy - r * 1.9 - 2}Q${cx + r * 1.7 - 7} ${
+                      cy - r * 1.9 - 4
+                    } ${cx + r * 1.7 - 9} ${cy - r * 1.9 - 2}M${cx + r * 1.7 + 4} ${
+                      cy - r * 1.9 - 2
+                    }Q${cx + r * 1.7 + 7} ${cy - r * 1.9 - 4} ${cx + r * 1.7 + 9} ${cy - r * 1.9 - 2}`}
+                    stroke="#2B2B2B"
+                    strokeWidth={0.8}
+                    fill="none"
+                  />
+                  <Circle cx={cx - r * 1.5} cy={cy - r * 2.4} r={2.1} fill="#2B2B2B" />
+                  <Path
+                    d={`M${cx - r * 1.5 - 3} ${cy - r * 2.4 - 1.5}Q${cx - r * 1.5 - 5.5} ${
+                      cy - r * 2.4 - 3
+                    } ${cx - r * 1.5 - 7.5} ${cy - r * 2.4 - 1.5}M${cx - r * 1.5 + 3} ${
+                      cy - r * 2.4 - 1.5
+                    }Q${cx - r * 1.5 + 5.5} ${cy - r * 2.4 - 3} ${cx - r * 1.5 + 7.5} ${
+                      cy - r * 2.4 - 1.5
+                    }`}
+                    stroke="#2B2B2B"
+                    strokeWidth={0.7}
+                    fill="none"
+                  />
+                </G>
+              ) : null}
             </G>
           )}
         </Svg>

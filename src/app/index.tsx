@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -385,6 +385,15 @@ export default function GameScreen() {
     [clearTimers, runFinale]
   );
 
+  /** Player-facing restart, reachable mid-run - unlike the hidden demo
+   *  panel, this asks first: it throws away real progress. */
+  const confirmRestart = useCallback(() => {
+    Alert.alert('Restart the game?', 'This specimen and its progress will be lost.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Restart', style: 'destructive', onPress: () => hardReset() },
+    ]);
+  }, [hardReset]);
+
   /* ---------------- render ---------------- */
 
   const typedWhisper = useTypewriter(whisper, evil && !sheetUp);
@@ -419,7 +428,9 @@ export default function GameScreen() {
           source={lightSource}
           reading={lightReading}
           onToggleEnv={toggleEnv}
-          shakeKey={shakeKey}>
+          shakeKey={shakeKey}
+          onRestart={confirmRestart}
+          restartDisabled={!active}>
           <Plant
             level={state.level}
             mood={displayMood}

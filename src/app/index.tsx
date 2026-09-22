@@ -17,6 +17,7 @@ import { EndingSheet, IntroOverlay } from '@/components/game/overlays';
 import { Progress } from '@/components/game/progress';
 import { SpecimenTag } from '@/components/game/specimen-tag';
 import { Stage } from '@/components/game/stage';
+import { TutorialOverlay } from '@/components/game/tutorial-overlay';
 import { Particles, PulseRing, type Burst, type ParticleKind } from '@/components/plant/particles';
 import { Plant, SleepZs } from '@/components/plant/plant';
 import { tendencyOf } from '@/game/config';
@@ -59,6 +60,8 @@ export default function GameScreen() {
   const [shakeKey, setShakeKey] = useState(0);
   const [devOpen, setDevOpen] = useState(false);
   const [mark, setMark] = useState(newMark);
+  /** Shown between the title card and actually starting - see `beginRun`. */
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Evil takeover
   const [notifs, setNotifs] = useState<FakeNotif[]>([]);
@@ -310,6 +313,13 @@ export default function GameScreen() {
     interact(state.env === 'day' ? 'nightfall' : 'daylight');
   }, [active, state.env, interact]);
 
+  /** Actually begins gameplay, dismissing the title card and tutorial alike. */
+  const beginRun = useCallback(() => {
+    setShowTutorial(false);
+    dispatch({ type: 'start' });
+    setWhisper(WHISPER_START);
+  }, []);
+
   /* ---------------- demo controls ---------------- */
 
   const hardReset = useCallback(
@@ -323,6 +333,7 @@ export default function GameScreen() {
       setBurst(null);
       setMood('idle');
       setDevOpen(false);
+      setShowTutorial(false);
       dialogResolved.current = false;
       setMark(newMark());
 
@@ -437,11 +448,14 @@ export default function GameScreen() {
 
       <IntroOverlay
         palette={palette}
-        visible={!state.started}
-        onStart={() => {
-          dispatch({ type: 'start' });
-          setWhisper(WHISPER_START);
-        }}
+        visible={!state.started && !showTutorial}
+        onStart={() => setShowTutorial(true)}
+      />
+
+      <TutorialOverlay
+        palette={palette}
+        visible={!state.started && showTutorial}
+        onFinish={beginRun}
       />
 
       <DevPanel

@@ -1,22 +1,21 @@
 /**
  * Every tunable number for the game lives here.
  *
- * The demo has to be completable in 1-2 minutes, so interactions are worth a
- * lot and the thresholds are small. Progression (level) is driven purely by the
- * number of interactions; character (ending) is driven purely by the scores.
+ * Progression (level) is driven purely by the number of interactions;
+ * character (ending) is driven purely by the scores.
  */
 
 import type { EndingKind, InteractionKind, Scores } from './types';
 
 /** Cumulative interactions needed to reach levels 1..5. */
-export const THRESHOLDS = [0, 3, 7, 12, 18] as const;
+export const THRESHOLDS = [0, 15, 30, 50, 100] as const;
 
 /** The whole run is over at this many interactions. */
 export const FINAL_COUNT = THRESHOLDS[4];
 
 /**
- * What each interaction adds to the running scores. Deliberately chunky: after
- * ~18 actions the ending should be decisive, never a coin flip.
+ * What each interaction adds to the running scores. Deliberately chunky: by
+ * the end of a run the ending should be decisive, never a coin flip.
  */
 export const WEIGHTS: Record<InteractionKind, Partial<Scores>> = {
   // Tap interactions
@@ -40,21 +39,21 @@ export const ROUGH_KINDS: InteractionKind[] = ['shake', 'jolt'];
 /** Final ending thresholds, evaluated once at level 5. */
 export const ENDING_RULES = {
   /** Roughness at or above this = evil plant, regardless of anything else. */
-  badRoughness: 20,
+  badRoughness: 110,
   /** ...or this much roughness combined with too little gentle care. */
-  badMixed: { roughness: 12, maxGentle: 30 },
+  badMixed: { roughness: 65, maxGentle: 165 },
   /**
-   * The good ending needs all of these at once. `maxRoughness` is set so two
-   * rough moments are forgivable but a third is not - the plant should feel
-   * generous, not fragile.
+   * The good ending needs all of these at once. `maxRoughness` is set so a
+   * handful of rough moments are forgivable but sustained roughness isn't -
+   * the plant should feel generous, not fragile.
    */
-  good: { maxRoughness: 10, care: 10, attention: 10, light: 8 },
+  good: { maxRoughness: 55, care: 55, attention: 55, light: 45 },
 } as const;
 
 /** Softer version of the same rules, used at level 4 to foreshadow the ending. */
 export const TENDENCY_RULES = {
-  badRoughness: 12,
-  good: { maxRoughness: 5, care: 5, attention: 5, light: 4 },
+  badRoughness: 50,
+  good: { maxRoughness: 21, care: 21, attention: 21, light: 17 },
 } as const;
 
 /** Motion detection tuning (accelerometer magnitude is in g, ~1.0 at rest). */

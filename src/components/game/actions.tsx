@@ -1,44 +1,13 @@
 import { useCallback } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Path } from 'react-native-svg';
 
+import { ActionIcon } from '@/components/game/action-icon';
 import { ACTION_LABELS } from '@/game/copy';
 import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 
 export type TapKind = 'water' | 'sun' | 'stroke' | 'shake';
-
-function Icon({ kind, color }: { kind: TapKind; color: string }) {
-  const p = { stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' } as const;
-  switch (kind) {
-    case 'water':
-      return (
-        <Svg width={28} height={28} viewBox="0 0 24 24">
-          <Path d="M12 3S5 11 5 15a7 7 0 0 0 14 0c0-4-7-12-7-12z" {...p} />
-        </Svg>
-      );
-    case 'sun':
-      return (
-        <Svg width={28} height={28} viewBox="0 0 24 24">
-          <Circle cx={12} cy={12} r={4} {...p} />
-          <Path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" {...p} />
-        </Svg>
-      );
-    case 'stroke':
-      return (
-        <Svg width={28} height={28} viewBox="0 0 24 24">
-          <Path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.5A4 4 0 0 1 19 10c0 5.6-7 10-7 10z" {...p} />
-        </Svg>
-      );
-    case 'shake':
-      return (
-        <Svg width={28} height={28} viewBox="0 0 24 24">
-          <Path d="M2 12l4-6 4 12 4-12 4 12 4-6" {...p} />
-        </Svg>
-      );
-  }
-}
 
 function ActionButton({
   kind,
@@ -90,7 +59,7 @@ function ActionButton({
           style={[StyleSheet.absoluteFill, { backgroundColor: palette.ink, borderRadius: palette.radius + 4 }, fillStyle]}
           pointerEvents="none"
         />
-        <Icon kind={kind} color={palette.ink} />
+        <ActionIcon kind={kind} color={palette.ink} />
         <Text style={[styles.actLabel, { color: palette.ink, fontFamily: family('semibold', evil) }]}>
           {label}
         </Text>

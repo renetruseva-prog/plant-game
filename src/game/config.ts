@@ -131,8 +131,12 @@ export const TOUCH = {
    * a tiny flick shouldn't misclassify as a shake from sensor noise alone.
    */
   minDragForVelocity: 18,
-  /** Repeated quick taps in place read as aggressive even if each one is soft. */
-  rapidTapCount: 3,
+  /**
+   * Repeated quick taps in place read as aggressive even if each one is
+   * soft: a single isolated tap is always gentle, but the very next tap
+   * that lands within the window already tips it into a shake.
+   */
+  rapidTapCount: 2,
   rapidTapWindowMs: 700,
   /** How far the pupils drift while tracking a finger elsewhere on the stage. */
   eyeMaxOffset: 3.6,

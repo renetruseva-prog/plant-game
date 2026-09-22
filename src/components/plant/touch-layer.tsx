@@ -114,15 +114,14 @@ export function TouchLayer({
       let aggressive = dist >= TOUCH.minDragForVelocity && maxVelocity.value >= TOUCH.aggressiveVelocity;
 
       if (dist < TOUCH.minDragForVelocity) {
+        // A single gentle tap is a stroke; once a rapid streak reaches the
+        // threshold, every further tap in that same streak reads as a shake
+        // too - not just the one that happened to cross it - until a pause
+        // lets the counter decay back down, or a real drag interrupts it.
         cancelAnimation(tapCount);
         tapCount.value += 1;
-        if (tapCount.value >= TOUCH.rapidTapCount) {
-          aggressive = true;
-          tapCount.value = 0;
-        } else {
-          // Decays back to 0 unless another tap cancels this first.
-          tapCount.value = withDelay(TOUCH.rapidTapWindowMs, withTiming(0, { duration: 0 }));
-        }
+        if (tapCount.value >= TOUCH.rapidTapCount) aggressive = true;
+        tapCount.value = withDelay(TOUCH.rapidTapWindowMs, withTiming(0, { duration: 0 }));
       } else {
         cancelAnimation(tapCount);
         tapCount.value = 0;

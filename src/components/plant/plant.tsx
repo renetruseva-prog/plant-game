@@ -420,9 +420,6 @@ export function Plant({
               </G>
 
               <Face x={cx} y={cy} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
-
-              {/* At seed stage the soil sits in front, so it reads as half-buried. */}
-              {level === 1 ? <Path d="M112 306Q150 282 188 306Z" fill="#4A3B2F" /> : null}
             </G>
           )}
         </Svg>

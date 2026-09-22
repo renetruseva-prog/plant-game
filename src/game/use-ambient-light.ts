@@ -47,6 +47,14 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
       setStatus(available ? 'available' : 'unavailable');
       if (!available) return;
 
+      // Some environments (web, mismatched native modules) may not implement
+      // `addListener`. Guard against that to avoid "this._nativeModule.addListener
+      // is not a function" runtime errors.
+      if (typeof LightSensor.setUpdateInterval !== 'function' || typeof LightSensor.addListener !== 'function') {
+        setStatus('unavailable');
+        return;
+      }
+
       LightSensor.setUpdateInterval(LIGHT.intervalMs);
       sub = LightSensor.addListener(({ illuminance }) => {
         setLux(illuminance);

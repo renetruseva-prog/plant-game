@@ -1,22 +1,25 @@
 /**
  * Every tunable number for the game lives here.
  *
- * The demo has to be completable in 1-2 minutes, so interactions are worth a
- * lot and the thresholds are small. Progression (level) is driven purely by the
- * number of interactions; character (ending) is driven purely by the scores.
+ * Progression (level) is driven purely by the number of interactions;
+ * character (ending) is driven purely by the scores.
  */
 
 import type { EndingKind, InteractionKind, Scores } from './types';
 
-/** Cumulative interactions needed to reach levels 1..5. */
-export const THRESHOLDS = [0, 3, 7, 12, 18] as const;
+/**
+ * Cumulative interactions needed to reach levels 1..5. Level-to-level gaps
+ * are 15 / 30 / 50 / 100 (Seed->Sprout, Sprout->Growing, Growing->Becoming,
+ * Becoming->Fate), so the cumulative total climbs 0, 15, 45, 95, 195.
+ */
+export const THRESHOLDS = [0, 15, 45, 95, 195] as const;
 
 /** The whole run is over at this many interactions. */
 export const FINAL_COUNT = THRESHOLDS[4];
 
 /**
- * What each interaction adds to the running scores. Deliberately chunky: after
- * ~18 actions the ending should be decisive, never a coin flip.
+ * What each interaction adds to the running scores. Deliberately chunky: by
+ * the end of a run the ending should be decisive, never a coin flip.
  */
 export const WEIGHTS: Record<InteractionKind, Partial<Scores>> = {
   // Tap interactions
@@ -40,21 +43,45 @@ export const ROUGH_KINDS: InteractionKind[] = ['shake', 'jolt'];
 /** Final ending thresholds, evaluated once at level 5. */
 export const ENDING_RULES = {
   /** Roughness at or above this = evil plant, regardless of anything else. */
-  badRoughness: 20,
+  badRoughness: 217,
   /** ...or this much roughness combined with too little gentle care. */
-  badMixed: { roughness: 12, maxGentle: 30 },
+  badMixed: { roughness: 130, maxGentle: 325 },
   /**
-   * The good ending needs all of these at once. `maxRoughness` is set so two
-   * rough moments are forgivable but a third is not - the plant should feel
-   * generous, not fragile.
+   * The good ending needs all of these at once. `maxRoughness` is set so a
+   * handful of rough moments are forgivable but sustained roughness isn't -
+   * the plant should feel generous, not fragile.
    */
-  good: { maxRoughness: 10, care: 10, attention: 10, light: 8 },
+  good: { maxRoughness: 108, care: 108, attention: 108, light: 87 },
+  /**
+   * Watered and sunned diligently, but barely touched: it stops waiting for
+   * affection and starts catching its own. Judged by ratio rather than a
+   * flat cap - `attention` relative to `care + light` - so it scales with
+   * however many interactions actually happened, and still catches "a
+   * little" affection sneaking in without catching a genuinely balanced run
+   * that happens to lean on walk/outside more than deliberate stroking.
+   * `minCareLight` sits well above what care alone could reach from
+   * sun-only incidental care (every sun tap carries +1), so sunlight
+   * without any real watering doesn't get mistaken for both.
+   */
+  carnivore: { minCareLight: 250, maxAttentionRatio: 0.22, maxRoughness: 110 },
+  /**
+   * Plenty of light and touch, but almost never watered: it toughens up and
+   * stops needing to be. Same ratio idea, mirrored - `care` relative to
+   * `light + attention`.
+   */
+  cactus: { minLightAttention: 180, maxCareRatio: 0.27, maxRoughness: 110 },
 } as const;
 
-/** Softer version of the same rules, used at level 4 to foreshadow the ending. */
+/**
+ * Softer version of the same rules, used at level 4 to foreshadow the
+ * ending. The ratio thresholds don't need rescaling - a ratio already
+ * doesn't care how many interactions happened - only the absolute floors do.
+ */
 export const TENDENCY_RULES = {
-  badRoughness: 12,
-  good: { maxRoughness: 5, care: 5, attention: 5, light: 4 },
+  badRoughness: 95,
+  good: { maxRoughness: 40, care: 40, attention: 40, light: 32 },
+  carnivore: { minCareLight: 125, maxAttentionRatio: 0.22, maxRoughness: 55 },
+  cactus: { minLightAttention: 90, maxCareRatio: 0.27, maxRoughness: 55 },
 } as const;
 
 /** Motion detection tuning (accelerometer magnitude is in g, ~1.0 at rest). */
@@ -78,9 +105,9 @@ export const MOTION = {
   nudgeCooldownMs: 4000,
 } as const;
 
-/** Ambient light tuning. */
+/** Ambient light tuning (Android LightSensor - real lux). */
 export const LIGHT = {
-  /** Below this many lux the plant falls asleep (Android LightSensor only). */
+  /** Below this many lux the plant falls asleep. */
   darkLux: 12,
   /** Hysteresis so a flickering sensor doesn't strobe the UI. */
   brightLux: 40,
@@ -89,11 +116,87 @@ export const LIGHT = {
   nightHours: { from: 20, to: 7 },
 } as const;
 
+/**
+ * Ambient light tuning for the camera-brightness fallback (iOS, or any device
+ * without a LightSensor). There's no public ambient-light API on iOS, so this
+ * samples the camera feed instead and estimates brightness from its average
+ * luma (0-255). Auto-exposure means this is a cruder signal than real lux -
+ * it reliably tells a lit room from a genuinely dark one, but won't resolve
+ * subtle dimming the way a light meter would.
+ */
+export const CAMERA_LIGHT = {
+  intervalMs: 1500,
+  darkLuma: 55,
+  brightLuma: 100,
+  /** Sample every Nth pixel when averaging; keeps the decode cheap. */
+  sampleStride: 4,
+  jpegQuality: 0.3,
+  /**
+   * The env decision uses the median of this many recent readings rather
+   * than the latest one, so a single transient frame (motion blur, a hand
+   * crossing the lens) can't flip the room by itself.
+   */
+  smoothingWindow: 3,
+} as const;
+
 /** Location tuning for the "take me outside" interaction. */
 export const OUTSIDE = {
   /** Metres from the first-open anchor that count as "went outside". */
   distanceM: 40,
   timeoutMs: 8000,
+} as const;
+
+/** Touching the plant directly, on top of the button row and phone shaking. */
+export const TOUCH = {
+  /**
+   * A drag faster than this (px/s) anywhere during the touch reads as
+   * aggressive. Tuned to catch an ordinary brisk side-to-side slide, not
+   * only an extreme flick - it fires live, mid-drag, the moment it's crossed.
+   */
+  aggressiveVelocity: 500,
+  /**
+   * Below this total distance, velocity is ignored - a firm press-and-hold or
+   * a tiny flick shouldn't misclassify as a shake from sensor noise alone.
+   */
+  minDragForVelocity: 18,
+  /**
+   * Repeated quick taps in place read as aggressive even if each one is
+   * soft: a single isolated tap is always gentle, but the very next tap
+   * that lands within the window already tips it into a shake.
+   */
+  rapidTapCount: 2,
+  rapidTapWindowMs: 700,
+  /** Holding a finger still on the plant this long counts as a stroke, live. */
+  holdDurationMs: 1200,
+  /** How far the pupils drift while tracking a finger elsewhere on the stage. */
+  eyeMaxOffset: 3.6,
+  eyeFollowDuration: 90,
+  eyeReturnDuration: 380,
+} as const;
+
+/**
+ * Turning the phone upside down - rotated 180°, the way you'd hold an
+ * upside-down book, screen still facing you but inverted - drops the plant
+ * out of its pot for good. Detected from the accelerometer's own gravity
+ * reading (see `use-upside-down.ts`) rather than DeviceMotion's interface
+ * orientation, which never reports upside-down in a portrait-locked app.
+ */
+export const FALL = {
+  /** Degrees of rotation from the starting orientation that counts as
+   *  "upside down" - not quite the full 180° to leave some tolerance. */
+  angleThreshold: 140,
+  /** Must stay past that angle this long before it counts - a brief fumble
+   *  mid-handoff shouldn't permanently end the run. */
+  holdMs: 900,
+  /**
+   * Below this many degrees of live rotation, the plant doesn't visibly
+   * react at all - ordinary handling shifts the phone's angle constantly,
+   * and only a real, deliberate turn should show up as the plant tipping.
+   */
+  deadzoneDeg: 25,
+  /** How long the reveal of the fallen scene takes once triggered. */
+  revealDelayMs: 280,
+  revealDurationMs: 420,
 } as const;
 
 export function levelFor(count: number): number {
@@ -116,11 +219,28 @@ export function applyWeights(scores: Scores, kind: InteractionKind): Scores {
 
 const gentleTotal = (s: Scores) => s.care + s.light + s.attention;
 
+type CarnivoreRules = { minCareLight: number; maxAttentionRatio: number; maxRoughness: number };
+type CactusRules = { minLightAttention: number; maxCareRatio: number; maxRoughness: number };
+
+const isCarnivore = (s: Scores, rules: CarnivoreRules) =>
+  s.care >= rules.minCareLight &&
+  s.light >= rules.minCareLight &&
+  s.roughness <= rules.maxRoughness &&
+  s.attention <= (s.care + s.light) * rules.maxAttentionRatio;
+
+const isCactus = (s: Scores, rules: CactusRules) =>
+  s.light >= rules.minLightAttention &&
+  s.attention >= rules.minLightAttention &&
+  s.roughness <= rules.maxRoughness &&
+  s.care <= (s.light + s.attention) * rules.maxCareRatio;
+
 /** The final verdict. Computed once, at level 5. */
 export function endingOf(s: Scores): EndingKind {
-  const { badRoughness, badMixed, good } = ENDING_RULES;
+  const { badRoughness, badMixed, good, carnivore, cactus } = ENDING_RULES;
   if (s.roughness >= badRoughness) return 'bad';
   if (s.roughness >= badMixed.roughness && gentleTotal(s) <= badMixed.maxGentle) return 'bad';
+  if (isCarnivore(s, carnivore)) return 'carnivore';
+  if (isCactus(s, cactus)) return 'cactus';
   if (
     s.roughness <= good.maxRoughness &&
     s.care >= good.care &&
@@ -134,8 +254,10 @@ export function endingOf(s: Scores): EndingKind {
 
 /** Where the plant is currently heading, shown from level 4 so you can course-correct. */
 export function tendencyOf(s: Scores): EndingKind {
-  const { badRoughness, good } = TENDENCY_RULES;
+  const { badRoughness, good, carnivore, cactus } = TENDENCY_RULES;
   if (s.roughness >= badRoughness) return 'bad';
+  if (isCarnivore(s, carnivore)) return 'carnivore';
+  if (isCactus(s, cactus)) return 'cactus';
   if (
     s.roughness <= good.maxRoughness &&
     s.care >= good.care &&

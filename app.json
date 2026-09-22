@@ -50,7 +50,13 @@
           "motionPermission": "Specimen reacts when you walk with it or shake it."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Specimen reads brightness from the camera to tell whether your room is light or dark. No photos are saved or sent anywhere."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

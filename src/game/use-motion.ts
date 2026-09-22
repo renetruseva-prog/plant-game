@@ -52,9 +52,19 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
       const available = await Accelerometer.isAvailableAsync().catch(() => false);
       if (!available || cancelled) return;
 
+      // Guard against environments where the native module doesn't expose
+      // `addListener`, preventing "this._nativeModule.addListener is not a
+      // function" errors when running on web or with mismatched native modules.
+      if (typeof Accelerometer.setUpdateInterval !== 'function') {
+        return;
+      }
+
       Accelerometer.setUpdateInterval(MOTION.intervalMs);
-      sub = Accelerometer.addListener(({ x, y, z }) => {
-        const now = Date.now();
+
+      try {
+        if (typeof Accelerometer.addListener !== 'function') return;
+        sub = Accelerometer.addListener(({ x, y, z }) => {
+          const now = Date.now();
         const delta = Math.abs(Math.sqrt(x * x + y * y + z * z) - 1);
 
         // Live lean, clamped so a violent shake doesn't fling the plant away.
@@ -117,7 +127,15 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
           gentleSince.current = null;
           handlers.current.onNudge();
         }
-      });
+        });
+      } catch (e) {
+        // If the native implementation is missing or throws, avoid crashing
+        // the JS runtime — log and bail out; the app should continue with
+        // graceful fallback behavior.
+        // eslint-disable-next-line no-console
+        console.warn('Accelerometer.addListener failed:', e);
+        return;
+      }
     })();
 
     return () => {

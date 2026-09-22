@@ -9,33 +9,59 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 import type { Env } from '@/game/types';
 
+/**
+ * What is currently deciding the room's light state:
+ * - `sensor`: Android's real ambient light sensor, in lux.
+ * - `camera`: the camera-brightness fallback (iOS and anywhere without a
+ *   LightSensor), a 0-255 luma read as a rough percentage.
+ * - `manual`: no sensor available at all; the player toggles it by hand.
+ */
+export type LightSource = 'sensor' | 'camera' | 'manual';
+
 type Props = {
   palette: Palette;
   evil: boolean;
   env: Env;
-  /** Hides the manual toggle when a real light sensor is driving the room. */
-  sensorDriven: boolean;
+  source: LightSource;
+  /** Live reading for the read-out label: lux for `sensor`, 0-255 luma for `camera`. */
+  reading: number | null;
   onToggleEnv: () => void;
   /** Bumped to shake the whole stage on a rough interaction. */
   shakeKey: number;
+  onRestart: () => void;
+  restartDisabled: boolean;
   children: ReactNode;
 };
+
+function RestartIcon({ color }: { color: string }) {
+  const p = { stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' } as const;
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24">
+      <Path d="M4 12a8 8 0 1 1 2.5 5.8" {...p} />
+      <Path d="M4 17v-5h5" {...p} />
+    </Svg>
+  );
+}
 
 export function Stage({
   palette,
   evil,
   env,
-  sensorDriven,
+  source,
+  reading,
   onToggleEnv,
   shakeKey,
+  onRestart,
+  restartDisabled,
   children,
 }: Props) {
+  const sensorDriven = source !== 'manual';
   const shake = useSharedValue(0);
 
   useEffect(() => {
@@ -79,10 +105,43 @@ export function Stage({
 
       {!evil ? (
         <Pressable
-          onPress={onToggleEnv}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: env === 'day' }}
-          accessibilityLabel="Room light"
+          onPress={onRestart}
+          disabled={restartDisabled}
+          accessibilityRole="button"
+          accessibilityLabel="Restart the game"
+          style={[
+            styles.restart,
+            env === 'dark' && styles.restartDark,
+            restartDisabled && styles.restartDisabled,
+          ]}>
+          <RestartIcon color={env === 'dark' ? '#DCE6FF' : '#16251B'} />
+          <Text
+            style={[
+              styles.envText,
+              { fontFamily: family('semibold', false) },
+              env === 'dark' && styles.envTextDark,
+            ]}>
+            Restart
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {!evil ? (
+        <Pressable
+          // Sensor-driven rooms aren't tappable: a manual override would just
+          // be reverted by the next real reading a fraction of a second
+          // later, which reads as a bug rather than as the sensor working.
+          onPress={sensorDriven ? undefined : onToggleEnv}
+          disabled={sensorDriven}
+          accessibilityRole={sensorDriven ? 'text' : 'switch'}
+          accessibilityState={sensorDriven ? undefined : { checked: env === 'day' }}
+          accessibilityLabel={
+            source === 'sensor'
+              ? 'Room light, from the light sensor'
+              : source === 'camera'
+                ? 'Room light, from the camera'
+                : 'Room light'
+          }
           style={[styles.env, env === 'dark' && styles.envDark]}>
           <Text
             style={[
@@ -90,13 +149,13 @@ export function Stage({
               { fontFamily: family('semibold', false) },
               env === 'dark' && styles.envTextDark,
             ]}>
-            {sensorDriven
-              ? env === 'day'
-                ? 'Bright room'
-                : 'Dark room'
-              : env === 'day'
-                ? 'Curtains open'
-                : 'Curtains shut'}
+            {source === 'sensor'
+              ? `${env === 'day' ? 'Bright' : 'Dark'} · ${reading !== null ? `${Math.round(reading)} lux` : '…'}`
+              : source === 'camera'
+                ? `${env === 'day' ? 'Bright' : 'Dark'} · ${reading !== null ? `${Math.round((reading / 255) * 100)}%` : '…'} (camera)`
+                : env === 'day'
+                  ? 'Curtains open'
+                  : 'Curtains shut'}
           </Text>
           <View style={[styles.knob, env === 'dark' && styles.knobDark]}>
             <View style={[styles.knobDot, env === 'dark' && styles.knobDotDark]} />
@@ -124,6 +183,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.72)',
   },
   envDark: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  restart: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    zIndex: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.72)',
+  },
+  restartDark: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  restartDisabled: { opacity: 0.4 },
   envText: { fontSize: 12.5, color: '#16251B' },
   envTextDark: { color: '#DCE6FF' },
   knob: { width: 34, height: 20, borderRadius: 999, backgroundColor: '#F6C945', justifyContent: 'center' },

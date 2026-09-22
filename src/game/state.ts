@@ -42,7 +42,9 @@ export type Action =
   | { type: 'hydrate'; state: GameState }
   | { type: 'reset' }
   | { type: 'devJump'; level: number }
-  | { type: 'devForce'; ending: EndingKind };
+  | { type: 'devForce'; ending: EndingKind }
+  /** Turning the phone upside down: instant, regardless of progress. */
+  | { type: 'fall' };
 
 /**
  * Pure reducer. Both the level-up and the ending fall out of `count`, so the
@@ -101,6 +103,9 @@ export function reducer(state: GameState, action: Action): GameState {
         good: ['water', 'sun', 'stroke'],
         neutral: ['water', 'water', 'stroke'],
         bad: ['shake', 'shake', 'water'],
+        fell: ['water', 'stroke', 'sun'],
+        carnivore: ['water', 'sun'],
+        cactus: ['sun', 'stroke'],
       };
       const plan = plans[action.ending];
       let s: GameState = { ...freshState(), started: true };
@@ -109,6 +114,13 @@ export function reducer(state: GameState, action: Action): GameState {
       }
       // Guarantee the requested ending even if the weights are retuned later.
       return { ...s, level: 5, ending: action.ending };
+    }
+
+    case 'fall': {
+      // Instant and permanent, whatever the current progress - falling out
+      // of the pot doesn't care what level the plant was at.
+      if (state.ending) return state;
+      return { ...state, level: 5, count: Math.max(state.count, FINAL_COUNT), ending: 'fell' };
     }
   }
 }

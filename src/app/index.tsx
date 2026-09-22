@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Actions, type TapKind } from '@/components/game/actions';
+import { CameraLightSensor, type CameraLightStatus } from '@/components/game/camera-light-sensor';
 import { DevPanel } from '@/components/game/dev-panel';
 import {
   FakeNotifications,
@@ -16,8 +17,10 @@ import { EndingSheet, IntroOverlay } from '@/components/game/overlays';
 import { Progress } from '@/components/game/progress';
 import { SpecimenTag } from '@/components/game/specimen-tag';
 import { Stage } from '@/components/game/stage';
+import { TutorialOverlay } from '@/components/game/tutorial-overlay';
 import { Particles, PulseRing, type Burst, type ParticleKind } from '@/components/plant/particles';
 import { Plant, SleepZs } from '@/components/plant/plant';
+import { TouchLayer } from '@/components/plant/touch-layer';
 import { tendencyOf } from '@/game/config';
 import { ENDINGS, EVIL_SCRIPT, LEVELS, LINES, WHISPER_START, latinFor } from '@/game/copy';
 import { family, useGameFonts } from '@/game/fonts';
@@ -27,9 +30,11 @@ import { clearState, freshState, loadState, reducer, saveState } from '@/game/st
 import { paletteFor } from '@/game/theme';
 import type { EndingKind, InteractionKind, Mood } from '@/game/types';
 import { envFromClock, useAmbientLight } from '@/game/use-ambient-light';
+import { useEyeTracking } from '@/game/use-eye-tracking';
 import { useMotion } from '@/game/use-motion';
 import { useOutside } from '@/game/use-outside';
 import { useTypewriter } from '@/game/use-typewriter';
+import { useUpsideDown } from '@/game/use-upside-down';
 
 const PARTICLE_FOR: Partial<Record<InteractionKind, ParticleKind>> = {
   water: 'water',
@@ -56,8 +61,13 @@ export default function GameScreen() {
   const [whisper, setWhisper] = useState(WHISPER_START);
   const [burst, setBurst] = useState<Burst | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
+  const [pinchKey, setPinchKey] = useState(0);
   const [devOpen, setDevOpen] = useState(false);
+  /** Live pupil offset while a finger drags on the stage but off the plant. */
+  const { eyeX, eyeY, trackEyes, releaseEyes } = useEyeTracking();
   const [mark, setMark] = useState(newMark);
+  /** Shown between the title card and actually starting - see `beginRun`. */
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Evil takeover
   const [notifs, setNotifs] = useState<FakeNotif[]>([]);
@@ -160,10 +170,22 @@ export default function GameScreen() {
     (kind: EndingKind) => {
       hapticEnding(kind);
 
+      if (kind === 'fell') {
+        // Instant and sad, not the evil ending's elaborate takeover - a
+        // single beat, then straight to the verdict.
+        setWhisper('It fell.');
+        after(1400, () => setSheetUp(true));
+        return;
+      }
+
       if (kind !== 'bad') {
-        setWhisper(
-          kind === 'good' ? 'It opens up, petal by petal.' : 'It flattens out into a quiet tuft.'
-        );
+        const reveal: Record<Exclude<EndingKind, 'bad' | 'fell'>, string> = {
+          good: 'It opens up, petal by petal.',
+          neutral: 'It flattens out into a quiet tuft.',
+          carnivore: 'Its leaves fold shut around something.',
+          cactus: 'It draws in, thickens, toughens up.',
+        };
+        setWhisper(reveal[kind]);
         if (kind === 'good') {
           burstId.current += 1;
           setBurst({ id: burstId.current, kind: 'petal', count: 14 });
@@ -248,6 +270,24 @@ export default function GameScreen() {
     [state, runFinale]
   );
 
+  /** A pinch on the plant scores as a stroke and additionally bumps the
+   *  cheek-squeeze animation, which a plain stroke doesn't trigger. */
+  const onPlantPinch = useCallback(() => {
+    setPinchKey((k) => k + 1);
+    interact('stroke');
+  }, [interact]);
+
+  /** Turning the phone upside down: instant and permanent, whatever level
+   *  the plant was at. Bypasses `interact` entirely - this isn't a scored
+   *  interaction, it's a dedicated way the run can end. */
+  const onFall = useCallback(() => {
+    if (!state.started || state.ending) return;
+    dispatch({ type: 'fall' });
+    runFinale('fell');
+  }, [state.started, state.ending, runFinale]);
+
+  const { fallAngle } = useUpsideDown(active, onFall);
+
   /* ---------------- device interactions ---------------- */
 
   const tilt = useMotion(active, {
@@ -256,10 +296,27 @@ export default function GameScreen() {
     onJolt: () => interact('jolt'),
   });
 
-  const { hasSensor } = useAmbientLight(active, (env) => {
-    if (env === state.env) return;
-    interact(env === 'dark' ? 'nightfall' : 'daylight');
-  });
+  const onLightEnv = useCallback(
+    (env: 'day' | 'dark') => {
+      if (env === state.env) return;
+      interact(env === 'dark' ? 'nightfall' : 'daylight');
+    },
+    [state.env, interact]
+  );
+
+  const { status: lightSensorStatus, lux } = useAmbientLight(active, onLightEnv);
+
+  // Only fall back to the camera once we actually know there's no LightSensor
+  // - 'checking' means the async probe hasn't resolved yet, and mounting the
+  // camera (and prompting for its permission) during that window would ask
+  // Android users for a permission the real sensor never needed.
+  const [cameraStatus, setCameraStatus] = useState<CameraLightStatus>('pending');
+  const [cameraLuma, setCameraLuma] = useState<number | null>(null);
+  const cameraEnabled = active && lightSensorStatus === 'unavailable';
+
+  const lightSource: 'sensor' | 'camera' | 'manual' =
+    lightSensorStatus === 'available' ? 'sensor' : cameraStatus === 'active' ? 'camera' : 'manual';
+  const lightReading = lightSource === 'sensor' ? lux : lightSource === 'camera' ? cameraLuma : null;
 
   const { check: checkOutside, busy: outsideBusy } = useOutside();
 
@@ -292,6 +349,13 @@ export default function GameScreen() {
     interact(state.env === 'day' ? 'nightfall' : 'daylight');
   }, [active, state.env, interact]);
 
+  /** Actually begins gameplay, dismissing the title card and tutorial alike. */
+  const beginRun = useCallback(() => {
+    setShowTutorial(false);
+    dispatch({ type: 'start' });
+    setWhisper(WHISPER_START);
+  }, []);
+
   /* ---------------- demo controls ---------------- */
 
   const hardReset = useCallback(
@@ -305,6 +369,7 @@ export default function GameScreen() {
       setBurst(null);
       setMood('idle');
       setDevOpen(false);
+      setShowTutorial(false);
       dialogResolved.current = false;
       setMark(newMark());
 
@@ -323,6 +388,15 @@ export default function GameScreen() {
     },
     [clearTimers, runFinale]
   );
+
+  /** Player-facing restart, reachable mid-run - unlike the hidden demo
+   *  panel, this asks first: it throws away real progress. */
+  const confirmRestart = useCallback(() => {
+    Alert.alert('Restart the game?', 'This specimen and its progress will be lost.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Restart', style: 'destructive', onPress: () => hardReset() },
+    ]);
+  }, [hardReset]);
 
   /* ---------------- render ---------------- */
 
@@ -355,9 +429,12 @@ export default function GameScreen() {
           palette={palette}
           evil={evil}
           env={state.env}
-          sensorDriven={hasSensor}
+          source={lightSource}
+          reading={lightReading}
           onToggleEnv={toggleEnv}
-          shakeKey={shakeKey}>
+          shakeKey={shakeKey}
+          onRestart={confirmRestart}
+          restartDisabled={!active}>
           <Plant
             level={state.level}
             mood={displayMood}
@@ -365,11 +442,26 @@ export default function GameScreen() {
             ending={state.ending}
             roughRatio={roughRatio}
             popKey={growthKey}
+            pinchKey={pinchKey}
             tilt={tilt}
+            eyeX={eyeX}
+            eyeY={eyeY}
+            fallAngle={fallAngle}
           />
           <SleepZs visible={displayMood === 'sleep'} />
           <Particles burst={burst} />
           <PulseRing pulseKey={growthKey} color={evil ? '#FF3B6B' : '#ffffff'} />
+          <TouchLayer
+            level={state.level}
+            form={form}
+            ending={state.ending}
+            disabled={!active}
+            onStroke={() => interact('stroke')}
+            onShake={() => interact('shake')}
+            onPinch={onPlantPinch}
+            onTrackEyes={trackEyes}
+            onReleaseEyes={releaseEyes}
+          />
         </Stage>
 
         <Animated.Text
@@ -393,6 +485,13 @@ export default function GameScreen() {
         />
       </SafeAreaView>
 
+      <CameraLightSensor
+        enabled={cameraEnabled}
+        onEnvChange={onLightEnv}
+        onStatus={setCameraStatus}
+        onBrightness={setCameraLuma}
+      />
+
       <GlitchOverlay active={glitching} />
       <FakeNotifications
         items={notifs}
@@ -411,11 +510,14 @@ export default function GameScreen() {
 
       <IntroOverlay
         palette={palette}
-        visible={!state.started}
-        onStart={() => {
-          dispatch({ type: 'start' });
-          setWhisper(WHISPER_START);
-        }}
+        visible={!state.started && !showTutorial}
+        onStart={() => setShowTutorial(true)}
+      />
+
+      <TutorialOverlay
+        palette={palette}
+        visible={!state.started && showTutorial}
+        onFinish={beginRun}
       />
 
       <DevPanel

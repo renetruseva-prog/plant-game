@@ -60,13 +60,37 @@ export const ENDINGS: Record<
     goal: 'It remembers how you treated it.',
     body: 'Rough handling taught it to fight back. None of that was real: nothing on your phone was touched.',
   },
+  fell: {
+    latin: 'Planta lapsa',
+    title: 'It fell.',
+    goal: 'It couldn’t hold on.',
+    body: 'Turned upside down with nowhere to root, it slipped out of the pot. That one was on you.',
+  },
+  carnivore: {
+    latin: 'Dionaea vorax',
+    title: 'It bites.',
+    goal: 'It found its own way to feed.',
+    body: 'All water, all light, never touched - it stopped waiting for affection and started catching its own dinner.',
+  },
+  cactus: {
+    latin: 'Cactus solitarius',
+    title: 'It toughened up.',
+    goal: 'It learned to need less.',
+    body: 'Plenty of light, plenty of touch, but you barely watered it - so it stopped needing to be watered at all.',
+  },
 };
 
 /** Latin name shown on the specimen tag as the plant becomes identifiable. */
 export function latinFor(level: number, form: EndingKind | null, ending: EndingKind | null) {
   if (ending) return ENDINGS[ending].latin;
-  if (level >= 4 && form) {
-    return { good: 'Bellis (?)', neutral: 'Poa (?)', bad: 'Umbra (?)' }[form];
+  if (level >= 4 && form && form !== 'fell') {
+    return {
+      good: 'Bellis (?)',
+      neutral: 'Poa (?)',
+      bad: 'Umbra (?)',
+      carnivore: 'Dionaea (?)',
+      cactus: 'Cactus (?)',
+    }[form];
   }
   if (level === 3) return 'Planta cognoscenda';
   return 'Planta incognita';

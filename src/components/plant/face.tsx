@@ -1,8 +1,10 @@
+import Animated, { useAnimatedProps, type SharedValue } from 'react-native-reanimated';
 import { Circle, G, Path } from 'react-native-svg';
 
 import type { EndingKind, Mood } from '@/game/types';
 
 const INK = '#16251B';
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type Props = {
   x: number;
@@ -11,13 +13,41 @@ type Props = {
   mood: Mood;
   form: EndingKind | null;
   ending: EndingKind | null;
+  /** Live pupil offset while a finger drags elsewhere on the stage. Only the
+   *  idle face has round pupils to actually shift; every other mood's eyes
+   *  are drawn as curves with no "look direction" to redirect. */
+  eyeX: SharedValue<number>;
+  eyeY: SharedValue<number>;
 };
+
+/** The one pair of eyes that can plausibly "look" somewhere. */
+function IdleEyes({
+  x,
+  y,
+  r,
+  fill,
+  eyeX,
+  eyeY,
+}: {
+  x: number;
+  y: number;
+  r: number;
+  fill: string;
+  eyeX: SharedValue<number>;
+  eyeY: SharedValue<number>;
+}) {
+  const props = useAnimatedProps(() => ({
+    cx: x + eyeX.value,
+    cy: y + eyeY.value,
+  }));
+  return <AnimatedCircle animatedProps={props} r={r} fill={fill} />;
+}
 
 /**
  * The face is drawn from the head's centre and radius so it scales with the
  * plant across all five levels without a separate sprite per stage.
  */
-export function Face({ x, y, r, mood, form, ending }: Props) {
+export function Face({ x, y, r, mood, form, ending, eyeX, eyeY }: Props) {
   const evil = ending === 'bad';
   const stroke = evil ? '#FF4D7D' : INK;
   const dx = r * 0.38;
@@ -123,7 +153,7 @@ export function Face({ x, y, r, mood, form, ending }: Props) {
   return (
     <G>
       {[-1, 1].map((s) => (
-        <Circle key={s} cx={x + s * dx} cy={ey} r={er} fill={stroke} />
+        <IdleEyes key={s} x={x + s * dx} y={ey} r={er} fill={stroke} eyeX={eyeX} eyeY={eyeY} />
       ))}
       <Path
         d={`M${x - r * 0.2} ${y + r * 0.25}Q${x} ${y + r * 0.42} ${x + r * 0.2} ${y + r * 0.25}`}

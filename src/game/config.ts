@@ -122,6 +122,24 @@ export const OUTSIDE = {
   timeoutMs: 8000,
 } as const;
 
+/** Touching the plant directly, on top of the button row and phone shaking. */
+export const TOUCH = {
+  /** A drag faster than this (px/s) anywhere during the touch reads as aggressive. */
+  aggressiveVelocity: 900,
+  /**
+   * Below this total distance, velocity is ignored - a firm press-and-hold or
+   * a tiny flick shouldn't misclassify as a shake from sensor noise alone.
+   */
+  minDragForVelocity: 18,
+  /** Repeated quick taps in place read as aggressive even if each one is soft. */
+  rapidTapCount: 3,
+  rapidTapWindowMs: 700,
+  /** How far the pupils drift while tracking a finger elsewhere on the stage. */
+  eyeMaxOffset: 3.6,
+  eyeFollowDuration: 90,
+  eyeReturnDuration: 380,
+} as const;
+
 export function levelFor(count: number): number {
   let level = 1;
   THRESHOLDS.forEach((threshold, i) => {

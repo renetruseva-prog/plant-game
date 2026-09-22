@@ -21,17 +21,13 @@ import Svg, {
   Stop,
 } from 'react-native-svg';
 
+import { getPlantGeometry, VIEW_H, VIEW_W } from '@/game/plant-geometry';
 import type { EndingKind, Mood } from '@/game/types';
 
 import { Face } from './face';
 
 const INK = '#16251B';
-export const VIEW_W = 300;
-export const VIEW_H = 380;
-
-/** Stem height and head radius per level: the whole growth curve in two maps. */
-const STEM_H: Record<number, number> = { 1: 0, 2: 58, 3: 104, 4: 142, 5: 152 };
-const HEAD_R: Record<number, number> = { 1: 15, 2: 20, 3: 27, 4: 33, 5: 24 };
+export { VIEW_H, VIEW_W };
 
 const hexToRgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
 
@@ -54,15 +50,21 @@ type Props = {
   roughRatio: number;
   /** Bumped on every level-up to fire the pop. */
   popKey: number;
+  /** Bumped whenever the plant is pinched, to fire the cheek-squeeze. */
+  pinchKey: number;
   /** Live device tilt, -1..1. */
   tilt?: SharedValue<number>;
+  /** Live pupil offset while a finger drags elsewhere on the stage. */
+  eyeX: SharedValue<number>;
+  eyeY: SharedValue<number>;
 };
 
-export function Plant({ level, mood, form, ending, roughRatio, popKey, tilt }: Props) {
+export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey, tilt, eyeX, eyeY }: Props) {
   const breathe = useSharedValue(0);
   const sway = useSharedValue(0);
   const jitter = useSharedValue(0);
   const pop = useSharedValue(1);
+  const squish = useSharedValue(1);
 
   // One looping driver per mood; the unused ones are parked at 0 so the styles
   // below can simply sum their contributions.
@@ -107,6 +109,18 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, tilt }: P
     pop.value = withSpring(1, { damping: 7, stiffness: 190, mass: 0.6 });
   }, [popKey, pop]);
 
+  // A pinch squeezes it sideways and lets it bounce back, distinct from the
+  // level-up pop: cheeks compress in, then spring out again.
+  const settledPinch = useRef(false);
+  useEffect(() => {
+    if (!settledPinch.current) {
+      settledPinch.current = true;
+      return;
+    }
+    squish.value = 0.8;
+    squish.value = withSpring(1, { damping: 5, stiffness: 260, mass: 0.5 });
+  }, [pinchKey, squish]);
+
   const style = useAnimatedStyle(() => {
     const swayDeg = (sway.value * 2 - 1) * 3.5;
     const jitterDeg = (jitter.value * 2 - 1) * 2;
@@ -116,17 +130,13 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, tilt }: P
       transform: [
         { translateX: jitterX },
         { rotate: `${swayDeg + jitterDeg + leanDeg}deg` },
-        { scaleX: pop.value * (1 + breathe.value * 0.015) },
-        { scaleY: pop.value * (1 + breathe.value * 0.03) },
+        { scaleX: pop.value * squish.value * (1 + breathe.value * 0.015) },
+        { scaleY: pop.value * (2 - squish.value) * (1 + breathe.value * 0.03) },
       ],
     };
   });
 
-  const stemH = STEM_H[Math.min(level, 5)];
-  const r = ending === 'good' ? 26 : ending === 'bad' ? 36 : HEAD_R[Math.min(level, 5)];
-  const lean = form === 'bad' ? 12 : 0;
-  const cx = 150 + lean;
-  const cy = level === 1 ? 292 : 300 - stemH;
+  const { cx, cy, r, stemH } = getPlantGeometry(level, form, ending);
 
   let head =
     level === 1
@@ -231,7 +241,7 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, tilt }: P
                 />
               ))}
               <Circle cx={150} cy={286} r={r} fill={head} stroke={INK} strokeWidth={2.4} />
-              <Face x={150} y={286} r={r} mood={mood} form={form} ending={ending} />
+              <Face x={150} y={286} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
             </G>
           ) : (
             <G>
@@ -318,7 +328,7 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, tilt }: P
                 <Circle r={r} fill={head} stroke={INK} strokeWidth={2.4} />
               </G>
 
-              <Face x={cx} y={cy} r={r} mood={mood} form={form} ending={ending} />
+              <Face x={cx} y={cy} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
 
               {/* At seed stage the soil sits in front, so it reads as half-buried. */}
               {level === 1 ? <Path d="M112 306Q150 282 188 306Z" fill="#4A3B2F" /> : null}

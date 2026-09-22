@@ -20,6 +20,7 @@ import { Stage } from '@/components/game/stage';
 import { TutorialOverlay } from '@/components/game/tutorial-overlay';
 import { Particles, PulseRing, type Burst, type ParticleKind } from '@/components/plant/particles';
 import { Plant, SleepZs } from '@/components/plant/plant';
+import { TouchLayer } from '@/components/plant/touch-layer';
 import { tendencyOf } from '@/game/config';
 import { ENDINGS, EVIL_SCRIPT, LEVELS, LINES, WHISPER_START, latinFor } from '@/game/copy';
 import { family, useGameFonts } from '@/game/fonts';
@@ -29,6 +30,7 @@ import { clearState, freshState, loadState, reducer, saveState } from '@/game/st
 import { paletteFor } from '@/game/theme';
 import type { EndingKind, InteractionKind, Mood } from '@/game/types';
 import { envFromClock, useAmbientLight } from '@/game/use-ambient-light';
+import { useEyeTracking } from '@/game/use-eye-tracking';
 import { useMotion } from '@/game/use-motion';
 import { useOutside } from '@/game/use-outside';
 import { useTypewriter } from '@/game/use-typewriter';
@@ -58,7 +60,10 @@ export default function GameScreen() {
   const [whisper, setWhisper] = useState(WHISPER_START);
   const [burst, setBurst] = useState<Burst | null>(null);
   const [shakeKey, setShakeKey] = useState(0);
+  const [pinchKey, setPinchKey] = useState(0);
   const [devOpen, setDevOpen] = useState(false);
+  /** Live pupil offset while a finger drags on the stage but off the plant. */
+  const { eyeX, eyeY, trackEyes, releaseEyes } = useEyeTracking();
   const [mark, setMark] = useState(newMark);
   /** Shown between the title card and actually starting - see `beginRun`. */
   const [showTutorial, setShowTutorial] = useState(false);
@@ -252,6 +257,13 @@ export default function GameScreen() {
     [state, runFinale]
   );
 
+  /** A pinch on the plant scores as a stroke and additionally bumps the
+   *  cheek-squeeze animation, which a plain stroke doesn't trigger. */
+  const onPlantPinch = useCallback(() => {
+    setPinchKey((k) => k + 1);
+    interact('stroke');
+  }, [interact]);
+
   /* ---------------- device interactions ---------------- */
 
   const tilt = useMotion(active, {
@@ -395,11 +407,25 @@ export default function GameScreen() {
             ending={state.ending}
             roughRatio={roughRatio}
             popKey={growthKey}
+            pinchKey={pinchKey}
             tilt={tilt}
+            eyeX={eyeX}
+            eyeY={eyeY}
           />
           <SleepZs visible={displayMood === 'sleep'} />
           <Particles burst={burst} />
           <PulseRing pulseKey={growthKey} color={evil ? '#FF3B6B' : '#ffffff'} />
+          <TouchLayer
+            level={state.level}
+            form={form}
+            ending={state.ending}
+            disabled={!active}
+            onStroke={() => interact('stroke')}
+            onShake={() => interact('shake')}
+            onPinch={onPlantPinch}
+            onTrackEyes={trackEyes}
+            onReleaseEyes={releaseEyes}
+          />
         </Stage>
 
         <Animated.Text

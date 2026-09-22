@@ -256,7 +256,7 @@ export default function GameScreen() {
     onJolt: () => interact('jolt'),
   });
 
-  const { hasSensor } = useAmbientLight(active, (env) => {
+  const { hasSensor, lux } = useAmbientLight(active, (env) => {
     if (env === state.env) return;
     interact(env === 'dark' ? 'nightfall' : 'daylight');
   });
@@ -356,6 +356,7 @@ export default function GameScreen() {
           evil={evil}
           env={state.env}
           sensorDriven={hasSensor}
+          lux={lux}
           onToggleEnv={toggleEnv}
           shakeKey={shakeKey}>
           <Plant

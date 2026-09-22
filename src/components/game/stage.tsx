@@ -19,8 +19,10 @@ type Props = {
   palette: Palette;
   evil: boolean;
   env: Env;
-  /** Hides the manual toggle when a real light sensor is driving the room. */
+  /** A real light sensor is driving the room; the badge becomes a read-out. */
   sensorDriven: boolean;
+  /** Live lux reading while sensor-driven, for the read-out label. */
+  lux: number | null;
   onToggleEnv: () => void;
   /** Bumped to shake the whole stage on a rough interaction. */
   shakeKey: number;
@@ -32,6 +34,7 @@ export function Stage({
   evil,
   env,
   sensorDriven,
+  lux,
   onToggleEnv,
   shakeKey,
   children,
@@ -79,10 +82,14 @@ export function Stage({
 
       {!evil ? (
         <Pressable
-          onPress={onToggleEnv}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: env === 'day' }}
-          accessibilityLabel="Room light"
+          // Sensor-driven rooms aren't tappable: a manual override would just
+          // be reverted by the next real reading a fraction of a second
+          // later, which reads as a bug rather than as the sensor working.
+          onPress={sensorDriven ? undefined : onToggleEnv}
+          disabled={sensorDriven}
+          accessibilityRole={sensorDriven ? 'text' : 'switch'}
+          accessibilityState={sensorDriven ? undefined : { checked: env === 'day' }}
+          accessibilityLabel={sensorDriven ? 'Room light, from the light sensor' : 'Room light'}
           style={[styles.env, env === 'dark' && styles.envDark]}>
           <Text
             style={[
@@ -91,9 +98,7 @@ export function Stage({
               env === 'dark' && styles.envTextDark,
             ]}>
             {sensorDriven
-              ? env === 'day'
-                ? 'Bright room'
-                : 'Dark room'
+              ? `${env === 'day' ? 'Bright' : 'Dark'} · ${lux !== null ? `${Math.round(lux)} lux` : '…'}`
               : env === 'day'
                 ? 'Curtains open'
                 : 'Curtains shut'}

@@ -90,6 +90,9 @@ const TENDENCY_TINT: Record<EndingKind, Partial<Palette>> = {
   good: { accent: '#E8B33A', stageTop: '#DCE9C8', stageBottom: '#F6F6E4' },
   neutral: {},
   bad: { accent: '#7B3AA8', stageTop: '#B9C6D4', stageBottom: '#DCD8E8', dim: '#5A5269' },
+  // Falling is instant, never foreshadowed - this tint is never actually
+  // looked up, but the record needs an entry for every EndingKind.
+  fell: {},
 };
 
 export const EVIL_PALETTE: Palette = {
@@ -105,6 +108,20 @@ export const EVIL_PALETTE: Palette = {
   tracking: 1.2,
 };
 
+/** Sad and muted, not sinister - this is an accident, not the evil ending. */
+export const FALL_PALETTE: Palette = {
+  screen: '#EBE7E1',
+  paper: '#F8F6F2',
+  ink: '#3A342C',
+  dim: '#8A8072',
+  line: 'rgba(58,52,44,0.18)',
+  accent: '#8A7A5C',
+  stageTop: '#DCD5C8',
+  stageBottom: '#F1EEE7',
+  radius: 18,
+  tracking: 0,
+};
+
 const DARK_STAGE = { stageTop: '#1A2644', stageBottom: '#0D1526' };
 
 export function paletteFor(
@@ -114,6 +131,7 @@ export function paletteFor(
   ending: EndingKind | null
 ): Palette {
   if (ending === 'bad') return EVIL_PALETTE;
+  if (ending === 'fell') return FALL_PALETTE;
 
   let p = { ...BY_LEVEL[Math.min(level, 5) - 1] };
   if (level >= 4 && tendency) p = { ...p, ...TENDENCY_TINT[tendency] };

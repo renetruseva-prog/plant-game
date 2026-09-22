@@ -1,4 +1,9 @@
-export type EndingKind = 'good' | 'neutral' | 'bad';
+/**
+ * `'fell'` is not a scored ending - it's an instant, permanent one triggered
+ * by turning the phone upside down mid-run (see `use-upside-down.ts`), and
+ * bypasses the normal Level 5 reveal entirely.
+ */
+export type EndingKind = 'good' | 'neutral' | 'bad' | 'fell';
 
 /** Tap interactions plus the device-driven ones. */
 export type InteractionKind =

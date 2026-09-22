@@ -60,12 +60,18 @@ export const ENDINGS: Record<
     goal: 'It remembers how you treated it.',
     body: 'Rough handling taught it to fight back. None of that was real: nothing on your phone was touched.',
   },
+  fell: {
+    latin: 'Planta lapsa',
+    title: 'It fell.',
+    goal: 'It couldn’t hold on.',
+    body: 'Turned upside down with nowhere to root, it slipped out of the pot. That one was on you.',
+  },
 };
 
 /** Latin name shown on the specimen tag as the plant becomes identifiable. */
 export function latinFor(level: number, form: EndingKind | null, ending: EndingKind | null) {
   if (ending) return ENDINGS[ending].latin;
-  if (level >= 4 && form) {
+  if (level >= 4 && form && form !== 'fell') {
     return { good: 'Bellis (?)', neutral: 'Poa (?)', bad: 'Umbra (?)' }[form];
   }
   if (level === 3) return 'Planta cognoscenda';

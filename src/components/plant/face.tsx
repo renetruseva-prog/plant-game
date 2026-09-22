@@ -83,6 +83,27 @@ export function Face({ x, y, r, mood, form, ending, eyeX, eyeY }: Props) {
     );
   }
 
+  if (ending === 'fell') {
+    // Drooping, half-closed eyes and a deep frown - wilted, not wincing.
+    return (
+      <G>
+        {[-1, 1].map((s) => (
+          <Path
+            key={s}
+            d={`M${x + s * dx - er * 1.3} ${ey - er * 0.4}L${x + s * dx + er * 1.3} ${ey + er * 0.9}`}
+            fill="none"
+            {...line}
+          />
+        ))}
+        <Path
+          d={`M${x - r * 0.28} ${y + r * 0.5}Q${x} ${y + r * 0.22} ${x + r * 0.28} ${y + r * 0.5}`}
+          fill="none"
+          {...line}
+        />
+      </G>
+    );
+  }
+
   if (mood === 'sleep') {
     return (
       <G>

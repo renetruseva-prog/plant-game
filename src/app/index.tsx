@@ -34,6 +34,7 @@ import { useEyeTracking } from '@/game/use-eye-tracking';
 import { useMotion } from '@/game/use-motion';
 import { useOutside } from '@/game/use-outside';
 import { useTypewriter } from '@/game/use-typewriter';
+import { useUpsideDown } from '@/game/use-upside-down';
 
 const PARTICLE_FOR: Partial<Record<InteractionKind, ParticleKind>> = {
   water: 'water',
@@ -169,6 +170,14 @@ export default function GameScreen() {
     (kind: EndingKind) => {
       hapticEnding(kind);
 
+      if (kind === 'fell') {
+        // Instant and sad, not the evil ending's elaborate takeover - a
+        // single beat, then straight to the verdict.
+        setWhisper('It fell.');
+        after(1400, () => setSheetUp(true));
+        return;
+      }
+
       if (kind !== 'bad') {
         setWhisper(
           kind === 'good' ? 'It opens up, petal by petal.' : 'It flattens out into a quiet tuft.'
@@ -263,6 +272,17 @@ export default function GameScreen() {
     setPinchKey((k) => k + 1);
     interact('stroke');
   }, [interact]);
+
+  /** Turning the phone upside down: instant and permanent, whatever level
+   *  the plant was at. Bypasses `interact` entirely - this isn't a scored
+   *  interaction, it's a dedicated way the run can end. */
+  const onFall = useCallback(() => {
+    if (!state.started || state.ending) return;
+    dispatch({ type: 'fall' });
+    runFinale('fell');
+  }, [state.started, state.ending, runFinale]);
+
+  useUpsideDown(active, onFall);
 
   /* ---------------- device interactions ---------------- */
 

@@ -41,6 +41,7 @@ export function DevPanel({ visible, onJump, onForce, onReset, onClose }: Props) 
         <DevButton label="Good ending" onPress={() => onForce('good')} />
         <DevButton label="Neutral ending" onPress={() => onForce('neutral')} />
         <DevButton label="Bad ending" hot onPress={() => onForce('bad')} />
+        <DevButton label="It fell" hot onPress={() => onForce('fell')} />
       </View>
 
       <View style={styles.row}>

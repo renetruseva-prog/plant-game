@@ -73,6 +73,14 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
     cancelAnimation(sway);
     cancelAnimation(jitter);
 
+    if (ending === 'fell') {
+      // Dead and still - no breathing, no sway, no jitter.
+      breathe.value = withTiming(0, { duration: 200 });
+      sway.value = withTiming(0, { duration: 200 });
+      jitter.value = withTiming(0, { duration: 200 });
+      return;
+    }
+
     const slow = mood === 'sleep';
     breathe.value = 0;
     breathe.value = withRepeat(
@@ -96,7 +104,7 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
     } else {
       jitter.value = withTiming(0, { duration: 160 });
     }
-  }, [mood, breathe, sway, jitter]);
+  }, [mood, ending, breathe, sway, jitter]);
 
   // Skip the very first pass so the plant doesn't pop just for existing.
   const settled = useRef(false);
@@ -139,15 +147,17 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
   const { cx, cy, r, stemH } = getPlantGeometry(level, form, ending);
 
   let head =
-    level === 1
-      ? '#9A7449'
-      : ending === 'bad'
-        ? '#2B1140'
-        : ending === 'good'
-          ? '#F6C945'
-          : ending === 'neutral'
-            ? '#8DBF6A'
-            : mix('#86CF74', '#6D4C93', Math.min(1, roughRatio * 2.2));
+    ending === 'fell'
+      ? '#A98F63'
+      : level === 1
+        ? '#9A7449'
+        : ending === 'bad'
+          ? '#2B1140'
+          : ending === 'good'
+            ? '#F6C945'
+            : ending === 'neutral'
+              ? '#8DBF6A'
+              : mix('#86CF74', '#6D4C93', Math.min(1, roughRatio * 2.2));
   if (form === 'bad' && !ending) head = mix(head, '#3A1858', 0.5);
 
   const stemC = ending === 'bad' ? '#3B1D57' : '#3E9B57';
@@ -192,16 +202,34 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {/* Static pot and shadow: they must not breathe with the plant. */}
       <Svg style={StyleSheet.absoluteFill} viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} preserveAspectRatio="xMidYMax meet">
-        <Ellipse cx={150} cy={370} rx={76} ry={7} fill="rgba(0,0,0,0.16)" />
-        <Path
-          d="M94 306h112l-11 62h-90z"
-          fill="#F4F6F0"
-          stroke={INK}
-          strokeWidth={2.4}
-          strokeLinejoin="round"
-        />
-        <Rect x={88} y={298} width={124} height={14} rx={6} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
-        <Ellipse cx={150} cy={300} rx={58} ry={7} fill="#4A3B2F" />
+        {ending === 'fell' ? (
+          <G>
+            {/* Knocked on its side, the soil pouring out and across the shelf. */}
+            <Ellipse cx={150} cy={372} rx={92} ry={8} fill="rgba(0,0,0,0.14)" />
+            <G transform="rotate(-12 95 320)">
+              <Rect x={40} y={296} width={112} height={52} rx={16} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
+              <Ellipse cx={44} cy={322} rx={14} ry={24} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
+            </G>
+            <Ellipse cx={162} cy={326} rx={20} ry={22} fill="#4A3B2F" />
+            <Ellipse cx={198} cy={332} rx={36} ry={15} fill="#4A3B2F" />
+            <Ellipse cx={236} cy={336} rx={28} ry={10} fill="#4A3B2F" opacity={0.85} />
+            <Ellipse cx={212} cy={318} rx={9} ry={6} fill="#3A2E22" opacity={0.7} />
+            <Ellipse cx={246} cy={328} rx={7} ry={5} fill="#3A2E22" opacity={0.6} />
+          </G>
+        ) : (
+          <G>
+            <Ellipse cx={150} cy={370} rx={76} ry={7} fill="rgba(0,0,0,0.16)" />
+            <Path
+              d="M94 306h112l-11 62h-90z"
+              fill="#F4F6F0"
+              stroke={INK}
+              strokeWidth={2.4}
+              strokeLinejoin="round"
+            />
+            <Rect x={88} y={298} width={124} height={14} rx={6} fill="#F4F6F0" stroke={INK} strokeWidth={2.4} />
+            <Ellipse cx={150} cy={300} rx={58} ry={7} fill="#4A3B2F" />
+          </G>
+        )}
       </Svg>
 
       <Animated.View style={[StyleSheet.absoluteFill, styles.origin, style]}>
@@ -215,7 +243,44 @@ export function Plant({ level, mood, form, ending, roughRatio, popKey, pinchKey,
 
           {ending === 'bad' ? <Circle cx={cx} cy={cy} r={r * 2.6} fill="url(#redglow)" /> : null}
 
-          {ending === 'neutral' ? (
+          {ending === 'fell' ? (
+            <G>
+              {/* Slumped in the spilled soil: a short wilted stem, a head
+                  resting on its side. Not animated - see the mood effect. */}
+              <Path
+                d="M165 306Q185 330 205 340Q215 344 220 336"
+                stroke={INK}
+                strokeWidth={9}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <Path
+                d="M165 306Q185 330 205 340Q215 344 220 336"
+                stroke="#6B5A3A"
+                strokeWidth={5}
+                fill="none"
+                strokeLinecap="round"
+              />
+              <Path
+                d={leafPath(28)}
+                fill="#7A6A46"
+                stroke={INK}
+                strokeWidth={1.6}
+                strokeLinejoin="round"
+                transform="translate(192 335) rotate(150)"
+              />
+              <Path
+                d={leafPath(24)}
+                fill="#7A6A46"
+                stroke={INK}
+                strokeWidth={1.6}
+                strokeLinejoin="round"
+                transform="translate(178 320) rotate(210) scale(-1,1)"
+              />
+              <Circle cx={230} cy={330} r={r} fill={head} stroke={INK} strokeWidth={2.4} />
+              <Face x={230} y={330} r={r} mood={mood} form={form} ending={ending} eyeX={eyeX} eyeY={eyeY} />
+            </G>
+          ) : ending === 'neutral' ? (
             <G>
               {/* Ordinary grass: a flat tuft of blades, no stem at all. */}
               {(

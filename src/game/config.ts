@@ -150,6 +150,19 @@ export const TOUCH = {
   eyeReturnDuration: 380,
 } as const;
 
+/**
+ * Turning the phone upside down - rotated 180°, the way you'd hold an
+ * upside-down book, screen still facing you but inverted - drops the plant
+ * out of its pot for good. Detected via `DeviceMotion`'s OS-computed screen
+ * orientation rather than a raw accelerometer sign, so it doesn't depend on
+ * guessing which sign means "upright" on a given platform.
+ */
+export const FALL = {
+  /** Must stay upside down this long before it counts - a brief fumble
+   *  mid-handoff shouldn't permanently end the run. */
+  holdMs: 900,
+} as const;
+
 export function levelFor(count: number): number {
   let level = 1;
   THRESHOLDS.forEach((threshold, i) => {

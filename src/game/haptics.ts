@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
-import type { InteractionKind } from './types';
+import type { EndingKind, InteractionKind } from './types';
 
 const run = (fn: () => Promise<void>) => {
   if (Platform.OS === 'web') return;
@@ -44,7 +44,15 @@ export function hapticLevelUp() {
   });
 }
 
-export function hapticEnding(kind: 'good' | 'neutral' | 'bad') {
+export function hapticEnding(kind: EndingKind) {
+  if (kind === 'fell') {
+    // A single sharp drop, not the evil ending's sustained pummelling.
+    return run(async () => {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+      await sleep(70);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    });
+  }
   if (kind === 'bad') {
     return run(async () => {
       for (let i = 0; i < 5; i++) {

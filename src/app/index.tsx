@@ -420,7 +420,9 @@ export default function GameScreen() {
           env={state.env}
           shakeKey={shakeKey}
           onRestart={confirmRestart}
-          restartDisabled={!active}>
+          restartDisabled={!active}
+          onOpenGallery={openGallery}
+          onOpenHelp={() => setHelpOpen(true)}>
           <Plant
             level={state.level}
             mood={displayMood}

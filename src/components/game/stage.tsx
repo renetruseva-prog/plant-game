@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
+import { ActionIcon } from '@/components/game/action-icon';
 import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 import type { Env } from '@/game/types';
@@ -23,6 +24,8 @@ type Props = {
   shakeKey: number;
   onRestart: () => void;
   restartDisabled: boolean;
+  onOpenGallery: () => void;
+  onOpenHelp: () => void;
   children: ReactNode;
 };
 
@@ -30,8 +33,11 @@ function RestartIcon({ color }: { color: string }) {
   const p = { stroke: color, strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' } as const;
   return (
     <Svg width={16} height={16} viewBox="0 0 24 24">
-      <Path d="M4 12a8 8 0 1 1 2.5 5.8" {...p} />
-      <Path d="M4 17v-5h5" {...p} />
+      {/* A counter-clockwise arrow: the hook and the arc share an endpoint
+       *  (1,10), so the tail reads as one continuous stroke instead of a
+       *  loose line poking out of the circle. */}
+      <Path d="M1 4v6h6" {...p} />
+      <Path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" {...p} />
     </Svg>
   );
 }
@@ -43,6 +49,8 @@ export function Stage({
   shakeKey,
   onRestart,
   restartDisabled,
+  onOpenGallery,
+  onOpenHelp,
   children,
 }: Props) {
   const shake = useSharedValue(0);
@@ -87,26 +95,61 @@ export function Stage({
       {children}
 
       {!evil ? (
-        <Pressable
-          onPress={onRestart}
-          disabled={restartDisabled}
-          accessibilityRole="button"
-          accessibilityLabel="Restart the game"
-          style={[
-            styles.restart,
-            env === 'dark' && styles.restartDark,
-            restartDisabled && styles.restartDisabled,
-          ]}>
-          <RestartIcon color={env === 'dark' ? '#DCE6FF' : '#16251B'} />
-          <Text
+        <View style={styles.topLeftRow}>
+          <Pressable
+            onPress={onRestart}
+            disabled={restartDisabled}
+            accessibilityRole="button"
+            accessibilityLabel="Restart the game"
+            hitSlop={6}
             style={[
-              styles.envText,
-              { fontFamily: family('semibold', false) },
-              env === 'dark' && styles.envTextDark,
+              styles.chip,
+              env === 'dark' && styles.chipDark,
+              restartDisabled && styles.restartDisabled,
             ]}>
-            Restart
-          </Text>
-        </Pressable>
+            <RestartIcon color={env === 'dark' ? '#DCE6FF' : '#16251B'} />
+            <Text
+              style={[
+                styles.envText,
+                { fontFamily: family('semibold', false) },
+                env === 'dark' && styles.envTextDark,
+              ]}>
+              Restart
+            </Text>
+          </Pressable>
+
+          {/* Bigger and clearly a button - icon plus label, same pill
+           *  language as Restart/the light toggle, not a bare glyph tucked
+           *  into a text row where it reads as decoration. */}
+          <Pressable
+            onPress={onOpenGallery}
+            accessibilityRole="button"
+            accessibilityLabel="Past specimens"
+            hitSlop={6}
+            style={[styles.chip, env === 'dark' && styles.chipDark]}>
+            <ActionIcon kind="gallery" color={env === 'dark' ? '#DCE6FF' : '#16251B'} size={16} />
+            <Text
+              style={[
+                styles.envText,
+                { fontFamily: family('semibold', false) },
+                env === 'dark' && styles.envTextDark,
+              ]}>
+              Gallery
+            </Text>
+          </Pressable>
+
+          {/* Icon-only: "?" needs no label to read as help, and keeps this
+           *  row from crowding on narrower phones. Reopens the gesture
+           *  tutorial without touching game state - see `onOpenHelp`. */}
+          <Pressable
+            onPress={onOpenHelp}
+            accessibilityRole="button"
+            accessibilityLabel="How to play"
+            hitSlop={6}
+            style={[styles.chip, styles.iconOnlyChip, env === 'dark' && styles.chipDark]}>
+            <ActionIcon kind="help" color={env === 'dark' ? '#DCE6FF' : '#16251B'} size={18} />
+          </Pressable>
+        </View>
       ) : null}
     </Animated.View>
   );
@@ -114,20 +157,26 @@ export function Stage({
 
 const styles = StyleSheet.create({
   stage: { flex: 1, marginHorizontal: 16, marginTop: 12, overflow: 'hidden' },
-  restart: {
+  topLeftRow: {
     position: 'absolute',
     top: 12,
     left: 12,
     zIndex: 4,
     flexDirection: 'row',
+    gap: 8,
+  },
+  chip: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 12,
+    minHeight: 36,
     borderRadius: 999,
     backgroundColor: 'rgba(255,255,255,0.72)',
   },
-  restartDark: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  chipDark: { backgroundColor: 'rgba(255,255,255,0.16)' },
+  iconOnlyChip: { paddingHorizontal: 9, gap: 0 },
   restartDisabled: { opacity: 0.4 },
   envText: { fontSize: 12.5, color: '#16251B' },
   envTextDark: { color: '#DCE6FF' },

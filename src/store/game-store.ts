@@ -94,6 +94,8 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: 'specimen.game.v2',
+      // Must match the version already on players' phones, or the save is ignored.
+      version: 1,
       storage,
       // Everything but the actions and the `hydrated` flag.
       partialize: (s) => ({

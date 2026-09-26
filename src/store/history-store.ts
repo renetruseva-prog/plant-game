@@ -37,6 +37,8 @@ export const useHistoryStore = create<HistoryStore>()(
     }),
     {
       name: 'specimen.history.v2',
+      // Must match the version already on players' phones, or the save is ignored.
+      version: 1,
       storage,
       partialize: (s) => ({ entries: s.entries }),
       onRehydrateStorage: () => () => {

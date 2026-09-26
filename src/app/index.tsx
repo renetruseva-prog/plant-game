@@ -23,7 +23,7 @@ import { FingerAura } from '@/components/plant/finger-aura';
 import { Particles, PulseRing, type Burst, type ParticleKind } from '@/components/plant/particles';
 import { Plant, SleepZs } from '@/components/plant/plant';
 import { TouchLayer } from '@/components/plant/touch-layer';
-import { tendencyOf } from '@/game/config';
+import { LIGHT, tendencyOf } from '@/game/config';
 import { ENDINGS, EVIL_SCRIPT, LEVELS, LINES, WHISPER_START, latinFor } from '@/game/copy';
 import { family, useGameFonts } from '@/game/fonts';
 import { hapticAlarm, hapticEnding, hapticFor, hapticLevelUp } from '@/game/haptics';
@@ -343,13 +343,30 @@ export default function GameScreen() {
     [state.env, interact]
   );
 
-  const { status: lightSensorStatus } = useAmbientLight(active, onLightEnv);
+  const { status: lightSensorStatus, lux } = useAmbientLight(active, onLightEnv);
+  const luxRef = useRef(lux);
+  useEffect(() => {
+    luxRef.current = lux;
+  });
 
-  // Only fall back to the camera once we actually know there's no LightSensor
-  // - 'checking' means the async probe hasn't resolved yet, and mounting the
-  // camera (and prompting for its permission) during that window would ask
-  // Android users for a permission the real sensor never needed.
-  const cameraEnabled = active && lightSensorStatus === 'unavailable';
+  // The camera runs once we know which kind of phone this is - 'checking'
+  // means the async probe hasn't resolved yet, and mounting it (and asking
+  // for its permission) mid-probe could flash a prompt for nothing.
+  //  - No LightSensor (iPhone, some Androids): the camera is also the room's
+  //    light meter ('ambient').
+  //  - A real LightSensor (many Androids): that sensor keeps deciding day and
+  //    night, and the camera only watches for a finger over the lens
+  //    ('cover-only'). This does mean asking those players for the camera,
+  //    deliberately - it's what makes covering it put the plant to sleep.
+  const cameraEnabled = active && lightSensorStatus !== 'checking';
+  const cameraMode = lightSensorStatus === 'available' ? 'cover-only' : 'ambient';
+
+  /** A covering just ended in cover-only mode: put the room back to what the
+   *  real light sensor reads, which never stopped measuring. */
+  const onUncovered = useCallback(() => {
+    const reading = luxRef.current;
+    onLightEnv(reading !== null && reading <= LIGHT.darkLux ? 'dark' : 'day');
+  }, [onLightEnv]);
 
   const openGallery = useCallback(() => router.push('/gallery'), [router]);
 
@@ -490,6 +507,8 @@ export default function GameScreen() {
 
       <CameraLightSensor
         enabled={cameraEnabled}
+        mode={cameraMode}
+        onUncovered={onUncovered}
         onEnvChange={onLightEnv}
         onStatus={(status) => {
           console.log('[camera] status:', status);

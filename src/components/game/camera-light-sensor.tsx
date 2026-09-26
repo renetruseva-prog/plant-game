@@ -38,6 +38,18 @@ type Props = {
    *  the lens (see `looksCovered`) for `coveredHoldTicks` samples in a row -
    *  not merely because the room happens to be dark. */
   onSleep: () => void;
+  /** Fired when a covering ends, in `'cover-only'` mode - the camera isn't
+   *  tracking the room's light there, so it's up to the caller to put the
+   *  room back to whatever its own sensor says. */
+  onUncovered?: () => void;
+  /**
+   * `'ambient'` (the default) is the iOS/no-LightSensor fallback: the camera
+   * is also the room's light meter. `'cover-only'` is for phones that have a
+   * real light sensor (many Androids): that sensor keeps deciding day and
+   * night, and the camera only watches for a finger over the lens - covering
+   * the camera doesn't reliably cover that sensor, which sits elsewhere.
+   */
+  mode?: 'ambient' | 'cover-only';
   onDebug?: (info: CameraDebugInfo) => void;
 };
 
@@ -52,7 +64,8 @@ type Props = {
  * caller to fall back further, to the manual curtains toggle.
  *
  * Because it's reading the lens rather than a dedicated sensor, it can also
- * tell a covered lens apart from a merely dark room - see `onSleep`.
+ * tell a covered lens apart from a merely dark room - see `onSleep`. On phones
+ * that do have a light sensor it runs in `'cover-only'` mode: just that.
  *
  * The `CameraView` is mounted off-screen (not just invisible in place -
  * shifted well outside the viewport) at a real, ordinary size. A 2x2px view
@@ -66,7 +79,16 @@ type Props = {
  * back camera looks down into the table and reads its surface instead of the
  * room's light - a wrong reading, not an imprecise one.
  */
-export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness, onSleep, onDebug }: Props) {
+export function CameraLightSensor({
+  enabled,
+  onEnvChange,
+  onStatus,
+  onBrightness,
+  onSleep,
+  onUncovered,
+  mode = 'ambient',
+  onDebug,
+}: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
   /** Smallest picture size the camera offers, once known - decoding a
@@ -98,12 +120,16 @@ export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness
   const onBrightnessRef = useRef(onBrightness);
   const onSleepRef = useRef(onSleep);
   const onDebugRef = useRef(onDebug);
+  const onUncoveredRef = useRef(onUncovered);
+  const modeRef = useRef(mode);
   useEffect(() => {
     onEnvChangeRef.current = onEnvChange;
     onStatusRef.current = onStatus;
     onBrightnessRef.current = onBrightness;
     onSleepRef.current = onSleep;
     onDebugRef.current = onDebug;
+    onUncoveredRef.current = onUncovered;
+    modeRef.current = mode;
   });
 
   // Ask for permission once, lazily, only once the run actually needs it -
@@ -219,7 +245,14 @@ export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness
           // so the very next frames decide whether the room is actually
           // light or dark again, instead of a median still half-full of a
           // fingertip.
-          if (sleepFired.current) recentLumas.current = [];
+          if (sleepFired.current) {
+            recentLumas.current = [];
+            onUncoveredRef.current?.();
+            // Nothing else here decides day/night in cover-only mode, so
+            // forget that it was forced dark - the next covering has to be
+            // able to force it again.
+            if (modeRef.current === 'cover-only') lastEnv.current = null;
+          }
           coveredStreak.current = 0;
           sleepFired.current = false;
         }
@@ -237,6 +270,9 @@ export function CameraLightSensor({ enabled, onEnvChange, onStatus, onBrightness
         // left running it would call the room "day" on the very next sample
         // and wake the plant straight back up while the finger's still there.
         if (isCovered) return;
+
+        // With a real light sensor doing that job, the camera stops here.
+        if (modeRef.current === 'cover-only') return;
 
         recentLumas.current = [...recentLumas.current, luma].slice(-CAMERA_LIGHT.smoothingWindow);
         const smoothed = medianOf(recentLumas.current);

@@ -39,6 +39,24 @@ type Props = {
 };
 
 /**
+ * While a finger keeps holding on the plant, more affection keeps coming in
+ * (see `TOUCH.holdRepeatMs`). It's a JS timer because worklets can't wait;
+ * the gesture starts and stops it through runOnJS. One finger means at most
+ * one timer, so it lives at module level.
+ */
+let holdRepeat: ReturnType<typeof setInterval> | null = null;
+
+function stopHoldRepeat() {
+  if (holdRepeat) clearInterval(holdRepeat);
+  holdRepeat = null;
+}
+
+function startHoldRepeat(onStroke: () => void) {
+  stopHoldRepeat();
+  holdRepeat = setInterval(onStroke, TOUCH.holdRepeatMs);
+}
+
+/**
  * Lets the player touch the plant directly, on top of the Stroke/Shake
  * buttons and physically shaking the phone.
  *
@@ -72,6 +90,9 @@ export function TouchLayer({
   onAuraHold,
   onAuraHide,
 }: Props) {
+  // Stops the hold-repeat timer if the layer goes away mid-hold.
+  useEffect(() => stopHoldRepeat, []);
+
   const containerW = useSharedValue(0);
   const containerH = useSharedValue(0);
 
@@ -199,6 +220,7 @@ export function TouchLayer({
           if (finished && !firedHold.value && !firedAggressive.value) {
             firedHold.value = true;
             runOnJS(onStroke)();
+            runOnJS(startHoldRepeat)(onStroke);
           }
         })
       );
@@ -269,6 +291,7 @@ export function TouchLayer({
         speed >= TOUCH.aggressiveVelocity
       ) {
         firedAggressive.value = true;
+        runOnJS(stopHoldRepeat)();
         cancelAnimation(tapCount);
         tapCount.value = 0;
         runOnJS(onShake)();
@@ -332,6 +355,7 @@ export function TouchLayer({
     .onFinalize(() => {
       'worklet';
       cancelAnimation(holdTimer);
+      runOnJS(stopHoldRepeat)();
       onAuraHide();
     });
 

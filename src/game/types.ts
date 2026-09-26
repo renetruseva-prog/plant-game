@@ -60,3 +60,13 @@ export type GameState = {
    *  whenever the previous run was abandoned before reaching a verdict. */
   legacy: EndingKind | null;
 };
+
+/** One finished run, as kept for the gallery. */
+export type HistoryEntry = {
+  mark: string;
+  ending: EndingKind;
+  latin: string;
+  scores: Scores;
+  /** `Date.now()` when the run finished. */
+  date: number;
+};

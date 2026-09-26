@@ -9,7 +9,7 @@ import type { EndingKind, GameState, InteractionKind, Scores } from './types';
 
 const ZERO_SCORES: Scores = { care: 0, light: 0, attention: 0, roughness: 0 };
 
-export const ZERO_COUNTS: Record<InteractionKind, number> = {
+const ZERO_COUNTS: Record<InteractionKind, number> = {
   water: 0,
   sun: 0,
   stroke: 0,
@@ -21,8 +21,6 @@ export const ZERO_COUNTS: Record<InteractionKind, number> = {
   nightfall: 0,
   sleep: 0,
 };
-
-export { ZERO_SCORES };
 
 export function freshState(): GameState {
   return {

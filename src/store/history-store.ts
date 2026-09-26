@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 import type { HistoryEntry } from '@/game/types';
 
-import { createStorage } from './storage';
+import { storage } from './storage';
 
 /** Past specimens kept for the gallery; the oldest drop off past this. */
 const HISTORY_LIMIT = 50;
@@ -37,9 +37,7 @@ export const useHistoryStore = create<HistoryStore>()(
     }),
     {
       name: 'specimen.history.v2',
-      version: 1,
-      // The old code stored the bare array under its own key.
-      storage: createStorage('specimen.history.v1', (legacy) => ({ entries: Array.isArray(legacy) ? legacy : [] }), 1),
+      storage,
       partialize: (s) => ({ entries: s.entries }),
       onRehydrateStorage: () => () => {
         useHistoryStore.setState({ hydrated: true });

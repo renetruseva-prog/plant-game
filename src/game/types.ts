@@ -18,7 +18,12 @@ export type InteractionKind =
   | 'nudge'
   | 'jolt'
   | 'daylight'
-  | 'nightfall';
+  | 'nightfall'
+  /** Holding a finger over the camera lens (the iOS/no-sensor light
+   *  fallback) reads as tucking it in for the night, not as darkness alone -
+   *  scores the same as `sun`, since it's standing in for the light it isn't
+   *  getting from the room right now. */
+  | 'sleep';
 
 export type Scores = {
   care: number;

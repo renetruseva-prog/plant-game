@@ -17,6 +17,7 @@ const ZERO_COUNTS: Record<InteractionKind, number> = {
   jolt: 0,
   daylight: 0,
   nightfall: 0,
+  sleep: 0,
 };
 
 export function freshState(): GameState {

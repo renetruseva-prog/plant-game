@@ -17,6 +17,7 @@ export function hapticFor(kind: InteractionKind) {
       return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
     case 'sun':
     case 'daylight':
+    case 'sleep':
       return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft));
     case 'stroke':
     case 'nudge':

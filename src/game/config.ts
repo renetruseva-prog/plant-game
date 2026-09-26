@@ -34,6 +34,7 @@ export const WEIGHTS: Record<InteractionKind, Partial<Scores>> = {
   jolt: { roughness: 5 }, // aggressive physical shake
   daylight: { light: 3 }, // curtains opened or ambient light rose
   nightfall: { care: 1 }, // curtains closed: resting is mild care, not neglect
+  sleep: { light: 4, care: 1 }, // covering the camera: same reward as `sun`, earned a different way
 };
 
 /** Which interactions count as "rough" for the tendency read-out. */
@@ -161,6 +162,45 @@ export const CAMERA_LIGHT = {
    * crossing the lens) can't flip the room by itself.
    */
   smoothingWindow: 3,
+  /**
+   * Detecting a finger over the lens. Brightness alone doesn't work: on an
+   * iPhone, auto-exposure brightens a covered lens right back up, so in a
+   * lit room a fingertip reads as an orange-red glow about as bright as the
+   * room itself (on-device logs showed ~120 luma both covered and not).
+   * What reliably changes is the *character* of the frame - it goes almost
+   * featureless (`coveredMaxStdDev`) and, with light behind it, red
+   * (`coveredMinRedRatio`). In a dim room it just goes dark instead, which
+   * the relative-drop check below still catches.
+   */
+  /** Luma standard deviation at or below this reads as featureless - a
+   *  real room, even a plain ceiling, has more contrast than a fingertip. */
+  coveredMaxStdDev: 16,
+  /** Red over green+blue at or above this reads as light through skin. */
+  coveredMinRedRatio: 1.25,
+  /** A reading at or below this fraction of the recent baseline counts as
+   *  covered on its own, whatever the frame looks like. */
+  coveredDropRatio: 0.4,
+  /** A featureless frame this much darker than the baseline also counts,
+   *  even without the red tint (a covered lens in a dim, warm-lit room). */
+  coveredSoftDropRatio: 0.8,
+  /** The baseline itself must be at least this bright for the drop check to
+   *  apply - in an already-dark room there's no meaningful further "drop" to
+   *  detect, and the plant is already asleep via `darkLuma` regardless. */
+  coveredBaselineMin: 20,
+  /**
+   * How much of the baseline survives each uncovered sample that reads
+   * *dimmer* than it (0-1). A brighter reading always replaces the baseline
+   * immediately - only a dimmer one decays it, and slowly, because
+   * uncovering the lens doesn't mean the camera's auto-exposure has finished
+   * recovering yet. Without this lag, those still-dim recovery frames would
+   * get folded straight into "this room's normal brightness", quietly
+   * lowering the baseline every cover/uncover cycle until a second covering
+   * could no longer produce a big enough relative drop to register at all.
+   */
+  baselineDecay: 0.85,
+  /** Consecutive covered samples required before it counts as a deliberate
+   *  "tuck it in" gesture, not a finger brushing the lens in passing. */
+  coveredHoldTicks: 2,
 } as const;
 
 /** Touching the plant directly, on top of the button row and phone shaking. */

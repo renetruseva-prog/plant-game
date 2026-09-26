@@ -3,7 +3,7 @@ import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { CameraLightSensor } from '@/components/game/camera-light-sensor';
+import { CameraLightSensor, type CameraDebugInfo, type CameraLightStatus } from '@/components/game/camera-light-sensor';
 import { DevPanel } from '@/components/game/dev-panel';
 import {
   FakeNotifications,
@@ -62,6 +62,9 @@ export default function GameScreen() {
   const [shakeKey, setShakeKey] = useState(0);
   const [pinchKey, setPinchKey] = useState(0);
   const [devOpen, setDevOpen] = useState(false);
+  /** Only for the hidden dev panel - see `CameraLightSensor`'s `onDebug`. */
+  const [cameraStatus, setCameraStatus] = useState<CameraLightStatus>('pending');
+  const [cameraDebug, setCameraDebug] = useState<CameraDebugInfo | null>(null);
   /** Live pupil offset while a finger drags on the stage but off the plant. */
   const { eyeX, eyeY, trackEyes, releaseEyes } = useEyeTracking();
   /** The glow that follows the finger anywhere on the stage. */
@@ -448,8 +451,16 @@ export default function GameScreen() {
       <CameraLightSensor
         enabled={cameraEnabled}
         onEnvChange={onLightEnv}
-        onStatus={() => {}}
+        onStatus={(status) => {
+          console.log('[camera] status:', status);
+          setCameraStatus(status);
+        }}
         onBrightness={() => {}}
+        onSleep={() => interact('sleep')}
+        onDebug={(info) => {
+          console.log('[camera]', info);
+          setCameraDebug(info);
+        }}
       />
 
       <GlitchOverlay active={glitching} />
@@ -486,6 +497,9 @@ export default function GameScreen() {
         onForce={(ending) => hardReset({ force: ending })}
         onReset={() => hardReset()}
         onClose={() => setDevOpen(false)}
+        lightSensorStatus={lightSensorStatus}
+        cameraStatus={cameraStatus}
+        cameraDebug={cameraDebug}
       />
     </View>
   );

@@ -31,6 +31,11 @@ export const LINES: Record<InteractionKind, string[]> = {
   jolt: ['You shook it. Hard.', 'That hurt.', 'It braces itself against you.'],
   daylight: ['Light again. It wakes up.', 'The room brightens. It lifts.'],
   nightfall: ['The light drops. It falls asleep.', 'Dark now. It folds inward.'],
+  sleep: [
+    'Tucked in. It dreams of daylight.',
+    'Dark under your hand. It rests anyway.',
+    'No sun to give, so you gave it this instead.',
+  ],
 };
 
 export const ENDINGS: Record<

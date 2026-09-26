@@ -39,9 +39,15 @@ export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle
 
     let cancelled = false;
     let sub: { remove: () => void } | undefined;
-    let holdTimer: ReturnType<typeof setTimeout> | null = null;
     let fired = false;
     let baseline: { x: number; y: number } | null = null;
+    /** Low-passed gravity direction, so shaking doesn't whip the angle
+     *  around - see `FALL.angleSmoothing`. */
+    let smooth: { x: number; y: number } | null = null;
+    /** When the current stretch of being flipped began, and when it was last
+     *  actually seen flipped (for the grace period). */
+    let flippedSince: number | null = null;
+    let lastFlipped = 0;
 
     (async () => {
       const available = await Accelerometer.isAvailableAsync().catch(() => false);
@@ -58,8 +64,18 @@ export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle
         if (fired || cancelled) return;
 
         const mag = Math.hypot(x, y) || 1;
-        const nx = x / mag;
-        const ny = y / mag;
+        const rx = x / mag;
+        const ry = y / mag;
+
+        smooth = smooth
+          ? {
+              x: smooth.x + (rx - smooth.x) * FALL.angleSmoothing,
+              y: smooth.y + (ry - smooth.y) * FALL.angleSmoothing,
+            }
+          : { x: rx, y: ry };
+        const sMag = Math.hypot(smooth.x, smooth.y) || 1;
+        const nx = smooth.x / sMag;
+        const ny = smooth.y / sMag;
 
         if (!baseline) baseline = { x: nx, y: ny };
 
@@ -68,22 +84,25 @@ export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle
         const angleDeg = Math.atan2(cross, dot) * (180 / Math.PI);
         fallAngle.value = angleDeg;
 
-        const flipped = Math.abs(angleDeg) > FALL.angleThreshold;
-        if (flipped) {
-          holdTimer ??= setTimeout(() => {
+        // Checked on every sample rather than with a timer that a single dip
+        // can cancel: it counts once the phone has been upside down for
+        // `holdMs`, forgiving dips shorter than `graceMs` (shaking it).
+        const now = Date.now();
+        if (Math.abs(angleDeg) > FALL.angleThreshold) {
+          flippedSince ??= now;
+          lastFlipped = now;
+          if (now - flippedSince >= FALL.holdMs) {
             fired = true;
             onFallRef.current();
-          }, FALL.holdMs);
-        } else if (holdTimer) {
-          clearTimeout(holdTimer);
-          holdTimer = null;
+          }
+        } else if (flippedSince !== null && now - lastFlipped > FALL.graceMs) {
+          flippedSince = null;
         }
       });
     })();
 
     return () => {
       cancelled = true;
-      if (holdTimer) clearTimeout(holdTimer);
       sub?.remove();
     };
   }, [enabled, fallAngle]);

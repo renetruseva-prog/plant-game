@@ -214,6 +214,18 @@ export const FALL = {
    *  mid-handoff shouldn't permanently end the run. */
   holdMs: 900,
   /**
+   * How long the angle may dip back under the threshold without resetting
+   * that hold. Shaking a phone adds acceleration on top of gravity, so the
+   * measured angle jitters wildly - without this grace, a phone that's
+   * upside down *and* being shaken never stays past the threshold long
+   * enough to count.
+   */
+  graceMs: 600,
+  /** How much of each new reading goes into the gravity direction the angle
+   *  is computed from (0-1: lower filters shake harder, higher reacts
+   *  faster to a real turn). */
+  angleSmoothing: 0.3,
+  /**
    * Below this many degrees of live rotation, the plant doesn't visibly
    * react at all - ordinary handling shifts the phone's angle constantly,
    * and only a real, deliberate turn should show up as the plant tipping.

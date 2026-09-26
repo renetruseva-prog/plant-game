@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -19,6 +20,8 @@ import type { EndingKind, Mood } from '@/game/types';
 
 import { PlantArt, PotArt, SlumpedPlantArt, SpilledPotArt } from './plant-art';
 
+/** How the plant follows the phone's motion - see `smoothTilt` in `Plant`. */
+const TRACK_SPRING = { damping: 22, stiffness: 150, mass: 0.7 } as const;
 
 export { VIEW_H, VIEW_W };
 
@@ -66,6 +69,32 @@ export function Plant({
   /** 0 = normal/alive, 1 = fully showing the toppled scene. Animates the
    *  crossfade between them once the fall is confirmed. */
   const fellReveal = useSharedValue(0);
+
+  // The sensors only report ~20 times a second, so following them directly
+  // makes the plant move in 20Hz steps on a 60/120Hz screen. These follow
+  // the raw values with a spring instead, so every frame in between is
+  // interpolated. Slightly overdamped: tracking should feel fluid, not bouncy.
+  const smoothTilt = useSharedValue(0);
+  const smoothFall = useSharedValue(0);
+  useAnimatedReaction(
+    () => tilt?.value ?? 0,
+    (target) => {
+      smoothTilt.value = withSpring(target, TRACK_SPRING);
+    }
+  );
+  useAnimatedReaction(
+    () => fallAngle?.value ?? 0,
+    (target, prev) => {
+      // The angle wraps from +180 to -180; springing across that would spin
+      // the plant the long way round, so a wrap snaps instead.
+      if (prev !== null && Math.abs(target - prev) > 180) {
+        cancelAnimation(smoothFall);
+        smoothFall.value = target;
+      } else {
+        smoothFall.value = withSpring(target, TRACK_SPRING);
+      }
+    }
+  );
 
   // One looping driver per mood; the unused ones are parked at 0 so the styles
   // below can simply sum their contributions.
@@ -155,12 +184,12 @@ export function Plant({
     const swayDeg = (sway.value * 2 - 1) * 3.5;
     const jitterDeg = (jitter.value * 2 - 1) * 2;
     const jitterX = (jitter.value * 2 - 1) * 3;
-    const leanDeg = (tilt?.value ?? 0) * 3;
+    const leanDeg = smoothTilt.value * 3;
 
     // Ordinary handling shifts the phone's angle constantly; only a real,
     // deliberate turn beyond the deadzone should visibly tip the plant, and
     // it should track the rest of that turn directly, 1:1.
-    const raw = fallAngle?.value ?? 0;
+    const raw = smoothFall.value;
     const fallDeg = Math.sign(raw) * Math.max(0, Math.abs(raw) - FALL.deadzoneDeg);
 
     // Once it's actually fallen, keep drooping and dropping a little further

@@ -88,6 +88,13 @@ export const TENDENCY_RULES = {
 export const MOTION = {
   /** Sample rate in ms. 20Hz is enough to separate a shake from a walk. */
   intervalMs: 50,
+  /**
+   * How much of each new accelerometer sample goes into the value the plant
+   * leans with (0-1: lower is smoother, higher is more responsive). Walking
+   * makes the raw reading spike with every footfall; this only feeds the
+   * visual lean - the walk/nudge/jolt detection below still reads raw values.
+   */
+  tiltSmoothing: 0.25,
   /** |magnitude - 1g| above this is an aggressive spike. */
   joltDelta: 1.15,
   /** A single dropped phone must not ruin a run: require repeated spikes. */
@@ -103,6 +110,24 @@ export const MOTION = {
   walkCooldownMs: 7000,
   /** Sustained gentle movement that is not rhythmic enough to be a walk. */
   nudgeCooldownMs: 4000,
+  /**
+   * Samples collected right after motion detection turns on (typically while
+   * the player is still reading the intro card) to measure this specific
+   * device's actual resting magnitude, instead of assuming a textbook exact
+   * 1g - real accelerometers carry a small per-device bias that would
+   * otherwise shift every threshold above by the same fixed amount.
+   */
+  calibrationSamples: 6,
+  /**
+   * Corroborating rotation-rate (rad/s, from the gyroscope) required inside
+   * the jolt spike window for a spike run to actually fire as a jolt - a
+   * genuine shake tumbles the phone as well as accelerating it, where a
+   * single hard bump with little rotation (set down too firmly, knocked
+   * against a table) shouldn't count. Approximate: tuned by feel, not
+   * measurement, same as the other motion constants above. Ignored entirely
+   * on a device with no gyroscope, so jolt still works there.
+   */
+  joltGyroMin: 1.2,
 } as const;
 
 /** Ambient light tuning (Android LightSensor - real lux). */

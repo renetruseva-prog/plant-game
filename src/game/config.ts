@@ -32,9 +32,9 @@ export const WEIGHTS: Record<InteractionKind, Partial<Scores>> = {
   walk: { attention: 3, light: 1 }, // rhythmic accelerometer pattern
   nudge: { attention: 3 }, // gentle physical movement
   jolt: { roughness: 5 }, // aggressive physical shake
-  outside: { light: 5, care: 2 }, // location moved far enough / check-in
   daylight: { light: 3 }, // curtains opened or ambient light rose
   nightfall: { care: 1 }, // curtains closed: resting is mild care, not neglect
+  sleep: { light: 4, care: 1 }, // covering the camera: same reward as `sun`, earned a different way
 };
 
 /** Which interactions count as "rough" for the tendency read-out. */
@@ -58,7 +58,7 @@ export const ENDING_RULES = {
    * flat cap - `attention` relative to `care + light` - so it scales with
    * however many interactions actually happened, and still catches "a
    * little" affection sneaking in without catching a genuinely balanced run
-   * that happens to lean on walk/outside more than deliberate stroking.
+   * that happens to lean on walking more than deliberate stroking.
    * `minCareLight` sits well above what care alone could reach from
    * sun-only incidental care (every sun tap carries +1), so sunlight
    * without any real watering doesn't get mistaken for both.
@@ -88,6 +88,13 @@ export const TENDENCY_RULES = {
 export const MOTION = {
   /** Sample rate in ms. 20Hz is enough to separate a shake from a walk. */
   intervalMs: 50,
+  /**
+   * How much of each new accelerometer sample goes into the value the plant
+   * leans with (0-1: lower is smoother, higher is more responsive). Walking
+   * makes the raw reading spike with every footfall; this only feeds the
+   * visual lean - the walk/nudge/jolt detection below still reads raw values.
+   */
+  tiltSmoothing: 0.25,
   /** |magnitude - 1g| above this is an aggressive spike. */
   joltDelta: 1.15,
   /** A single dropped phone must not ruin a run: require repeated spikes. */
@@ -103,6 +110,24 @@ export const MOTION = {
   walkCooldownMs: 7000,
   /** Sustained gentle movement that is not rhythmic enough to be a walk. */
   nudgeCooldownMs: 4000,
+  /**
+   * Samples collected right after motion detection turns on (typically while
+   * the player is still reading the intro card) to measure this specific
+   * device's actual resting magnitude, instead of assuming a textbook exact
+   * 1g - real accelerometers carry a small per-device bias that would
+   * otherwise shift every threshold above by the same fixed amount.
+   */
+  calibrationSamples: 6,
+  /**
+   * Corroborating rotation-rate (rad/s, from the gyroscope) required inside
+   * the jolt spike window for a spike run to actually fire as a jolt - a
+   * genuine shake tumbles the phone as well as accelerating it, where a
+   * single hard bump with little rotation (set down too firmly, knocked
+   * against a table) shouldn't count. Approximate: tuned by feel, not
+   * measurement, same as the other motion constants above. Ignored entirely
+   * on a device with no gyroscope, so jolt still works there.
+   */
+  joltGyroMin: 1.2,
 } as const;
 
 /** Ambient light tuning (Android LightSensor - real lux). */
@@ -125,6 +150,9 @@ export const LIGHT = {
  * subtle dimming the way a light meter would.
  */
 export const CAMERA_LIGHT = {
+  /** Time between samples. Paired with the smallest available picture size
+   *  (see the sensor), this keeps sustained sampling from warming the phone
+   *  up - decoding full-resolution frames in JS every couple of seconds did. */
   intervalMs: 1500,
   darkLuma: 55,
   brightLuma: 100,
@@ -137,13 +165,45 @@ export const CAMERA_LIGHT = {
    * crossing the lens) can't flip the room by itself.
    */
   smoothingWindow: 3,
-} as const;
-
-/** Location tuning for the "take me outside" interaction. */
-export const OUTSIDE = {
-  /** Metres from the first-open anchor that count as "went outside". */
-  distanceM: 40,
-  timeoutMs: 8000,
+  /**
+   * Detecting a finger over the lens. Brightness alone doesn't work: on an
+   * iPhone, auto-exposure brightens a covered lens right back up, so in a
+   * lit room a fingertip reads as an orange-red glow about as bright as the
+   * room itself (on-device logs showed ~120 luma both covered and not).
+   * What reliably changes is the *character* of the frame - it goes almost
+   * featureless (`coveredMaxStdDev`) and, with light behind it, red
+   * (`coveredMinRedRatio`). In a dim room it just goes dark instead, which
+   * the relative-drop check below still catches.
+   */
+  /** Luma standard deviation at or below this reads as featureless - a
+   *  real room, even a plain ceiling, has more contrast than a fingertip. */
+  coveredMaxStdDev: 16,
+  /** Red over green+blue at or above this reads as light through skin. */
+  coveredMinRedRatio: 1.25,
+  /** A reading at or below this fraction of the recent baseline counts as
+   *  covered on its own, whatever the frame looks like. */
+  coveredDropRatio: 0.4,
+  /** A featureless frame this much darker than the baseline also counts,
+   *  even without the red tint (a covered lens in a dim, warm-lit room). */
+  coveredSoftDropRatio: 0.8,
+  /** The baseline itself must be at least this bright for the drop check to
+   *  apply - in an already-dark room there's no meaningful further "drop" to
+   *  detect, and the plant is already asleep via `darkLuma` regardless. */
+  coveredBaselineMin: 20,
+  /**
+   * How much of the baseline survives each uncovered sample that reads
+   * *dimmer* than it (0-1). A brighter reading always replaces the baseline
+   * immediately - only a dimmer one decays it, and slowly, because
+   * uncovering the lens doesn't mean the camera's auto-exposure has finished
+   * recovering yet. Without this lag, those still-dim recovery frames would
+   * get folded straight into "this room's normal brightness", quietly
+   * lowering the baseline every cover/uncover cycle until a second covering
+   * could no longer produce a big enough relative drop to register at all.
+   */
+  baselineDecay: 0.85,
+  /** Consecutive covered samples required before it counts as a deliberate
+   *  "tuck it in" gesture, not a finger brushing the lens in passing. */
+  coveredHoldTicks: 2,
 } as const;
 
 /** Touching the plant directly, on top of the button row and phone shaking. */
@@ -168,6 +228,35 @@ export const TOUCH = {
   rapidTapWindowMs: 700,
   /** Holding a finger still on the plant this long counts as a stroke, live. */
   holdDurationMs: 1200,
+  /**
+   * Movement past this (much smaller than `minDragForVelocity`) cancels the
+   * hold-to-stroke timer. A slow, deliberate drag - pouring water is often
+   * unhurried - can easily still be under `minDragForVelocity` a full
+   * `holdDurationMs` in, and reusing that bigger threshold here would let
+   * the hold fire and lock in a stroke before the drag ever gets a chance
+   * to become water or sun.
+   */
+  holdCancelDistance: 8,
+  /**
+   * A drag on the plant longer than this, and dominated by one axis (see
+   * `directionalAngleRatio`), reads as a deliberate gesture - down to water,
+   * up toward the light - rather than an ordinary pet. Bigger than
+   * `minDragForVelocity` so a short, mostly-vertical stroke still pets
+   * instead of accidentally watering.
+   */
+  directionalDragMinDistance: 30,
+  /** How much one axis must dominate the other for a drag to count as
+   *  "vertical" rather than an ambiguous diagonal (which still just pets). */
+  directionalAngleRatio: 1.3,
+  /**
+   * How far a vertical drag has to go before the finger aura previews it
+   * (blue for rain, gold for light). Much shorter than
+   * `directionalDragMinDistance`: the aura is feedback, not a commitment, so
+   * it should react as soon as it's plausible rather than after the gesture
+   * has already been decided - waiting for the full 30px left the first part
+   * of every slide looking like nothing was happening.
+   */
+  directionalPreviewDistance: 10,
   /** How far the pupils drift while tracking a finger elsewhere on the stage. */
   eyeMaxOffset: 3.6,
   eyeFollowDuration: 90,
@@ -188,6 +277,18 @@ export const FALL = {
   /** Must stay past that angle this long before it counts - a brief fumble
    *  mid-handoff shouldn't permanently end the run. */
   holdMs: 900,
+  /**
+   * How long the angle may dip back under the threshold without resetting
+   * that hold. Shaking a phone adds acceleration on top of gravity, so the
+   * measured angle jitters wildly - without this grace, a phone that's
+   * upside down *and* being shaken never stays past the threshold long
+   * enough to count.
+   */
+  graceMs: 600,
+  /** How much of each new reading goes into the gravity direction the angle
+   *  is computed from (0-1: lower filters shake harder, higher reacts
+   *  faster to a real turn). */
+  angleSmoothing: 0.3,
   /**
    * Below this many degrees of live rotation, the plant doesn't visibly
    * react at all - ordinary handling shifts the phone's angle constantly,

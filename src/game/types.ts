@@ -1,3 +1,7 @@
+
+//shared type definitions: what an "interaction" can be
+// what an "ending" can be and the shape of `GameState`
+
 /**
  * `'carnivore'` (all water and light, barely any affection) and `'cactus'`
  * (light and affection, barely any water) are scored endings alongside
@@ -17,9 +21,13 @@ export type InteractionKind =
   | 'walk'
   | 'nudge'
   | 'jolt'
-  | 'outside'
   | 'daylight'
-  | 'nightfall';
+  | 'nightfall'
+  /** Holding a finger over the camera lens (the iOS/no-sensor light
+   *  fallback) reads as tucking it in for the night, not as darkness alone -
+   *  scores the same as `sun`, since it's standing in for the light it isn't
+   *  getting from the room right now. */
+  | 'sleep';
 
 export type Scores = {
   care: number;
@@ -41,8 +49,14 @@ export type GameState = {
   level: number;
   ending: EndingKind | null;
   env: Env;
-  /** Set once the player has confirmed being outside. */
-  wentOutside: boolean;
   /** Dismissed the intro card. */
   started: boolean;
+  /** How many specimens this device has raised, counting this one. Purely
+   *  cosmetic - see `legacy` - it never affects scoring. */
+  generation: number;
+  /** The previous specimen's ending, carried into this one for flavour only:
+   *  the intro copy and the level-1 palette acknowledge it, but none of the
+   *  scoring in `config.ts` reads it. `null` for the very first specimen, or
+   *  whenever the previous run was abandoned before reaching a verdict. */
+  legacy: EndingKind | null;
 };

@@ -29,13 +29,13 @@ export const LINES: Record<InteractionKind, string[]> = {
   ],
   nudge: ['It felt that. Gently.', 'A soft tilt. It settles again.', 'It rocks, and likes it.'],
   jolt: ['You shook it. Hard.', 'That hurt.', 'It braces itself against you.'],
-  outside: [
-    'Outside. Real light, real air.',
-    'It opens up in the open air.',
-    'It has never felt this much sky.',
-  ],
   daylight: ['Light again. It wakes up.', 'The room brightens. It lifts.'],
   nightfall: ['The light drops. It falls asleep.', 'Dark now. It folds inward.'],
+  sleep: [
+    'Tucked in. It dreams of daylight.',
+    'Dark under your hand. It rests anyway.',
+    'No sun to give, so you gave it this instead.',
+  ],
 };
 
 export const ENDINGS: Record<
@@ -58,7 +58,7 @@ export const ENDINGS: Record<
     latin: 'Planta malefica',
     title: 'It took over.',
     goal: 'It remembers how you treated it.',
-    body: 'Rough handling taught it to fight back. None of that was real: nothing on your phone was touched.',
+    body: 'Rough handling taught it to fight back. None of it was real: the photo wasn’t saved, and nothing on your phone was touched.',
   },
   fell: {
     latin: 'Planta lapsa',
@@ -95,12 +95,6 @@ export function latinFor(level: number, form: EndingKind | null, ending: EndingK
   if (level === 3) return 'Planta cognoscenda';
   return 'Planta incognita';
 }
-
-/** Action labels. The evil plant relabels the whole interface. */
-export const ACTION_LABELS: Record<'normal' | 'evil', Record<string, string>> = {
-  normal: { water: 'Water', sun: 'Sunlight', stroke: 'Stroke', shake: 'Shake' },
-  evil: { water: 'give', sun: 'look', stroke: 'obey', shake: 'don’t' },
-};
 
 /** The scripted takeover. Each step is offset in ms from the reveal. */
 export type EvilStep =
@@ -152,3 +146,17 @@ export const EVIL_SCRIPT: EvilStep[] = [
 ];
 
 export const WHISPER_START = 'It hasn’t moved yet. Try something.';
+
+/**
+ * The intro card's body text for a specimen with a predecessor - shown
+ * instead of the default first-timer copy from the second specimen onward.
+ * Flavour only: nothing here affects scoring, see `legacy` on `GameState`.
+ */
+export const LEGACY_INTRO: Record<EndingKind, string> = {
+  good: 'The last one bloomed, given nothing but steady, gentle care. Let’s see about this one.',
+  neutral: 'The last one just got by - some care, some gaps. This one starts the same way: a blank page.',
+  bad: 'The last one turned on you. This one is already watching.',
+  fell: 'The last one slipped out of its pot and couldn’t hold on. Try to hang onto this one.',
+  carnivore: 'The last one stopped waiting for affection and started catching its own. This one hasn’t decided yet.',
+  cactus: 'The last one toughened up until it barely needed watering at all. This one might not.',
+};

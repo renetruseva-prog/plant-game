@@ -1,10 +1,10 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Actions, type TapKind } from '@/components/game/actions';
-import { CameraLightSensor, type CameraLightStatus } from '@/components/game/camera-light-sensor';
+import { CameraLightSensor, type CameraDebugInfo, type CameraLightStatus } from '@/components/game/camera-light-sensor';
 import { DevPanel } from '@/components/game/dev-panel';
 import {
   FakeNotifications,
@@ -12,27 +12,29 @@ import {
   GlitchOverlay,
   type FakeNotif,
 } from '@/components/game/evil-layer';
+import { EvilPhotoBooth } from '@/components/game/evil-photo';
 import { FakeStatusBar } from '@/components/game/fake-status-bar';
 import { EndingSheet, IntroOverlay } from '@/components/game/overlays';
 import { Progress } from '@/components/game/progress';
 import { SpecimenTag } from '@/components/game/specimen-tag';
 import { Stage } from '@/components/game/stage';
 import { TutorialOverlay } from '@/components/game/tutorial-overlay';
+import { FingerAura } from '@/components/plant/finger-aura';
 import { Particles, PulseRing, type Burst, type ParticleKind } from '@/components/plant/particles';
 import { Plant, SleepZs } from '@/components/plant/plant';
 import { TouchLayer } from '@/components/plant/touch-layer';
-import { tendencyOf } from '@/game/config';
+import { LIGHT, tendencyOf } from '@/game/config';
 import { ENDINGS, EVIL_SCRIPT, LEVELS, LINES, WHISPER_START, latinFor } from '@/game/copy';
 import { family, useGameFonts } from '@/game/fonts';
 import { hapticAlarm, hapticEnding, hapticFor, hapticLevelUp } from '@/game/haptics';
 import { cancelHaunting, hauntWithNotifications } from '@/game/notifications';
-import { clearState, freshState, loadState, reducer, saveState } from '@/game/state';
+import { appendHistory, clearState, freshState, loadState, reducer, saveState } from '@/game/state';
 import { paletteFor } from '@/game/theme';
 import type { EndingKind, InteractionKind, Mood } from '@/game/types';
 import { envFromClock, useAmbientLight } from '@/game/use-ambient-light';
 import { useEyeTracking } from '@/game/use-eye-tracking';
+import { useFingerAura } from '@/game/use-finger-aura';
 import { useMotion } from '@/game/use-motion';
-import { useOutside } from '@/game/use-outside';
 import { useTypewriter } from '@/game/use-typewriter';
 import { useUpsideDown } from '@/game/use-upside-down';
 
@@ -43,7 +45,6 @@ const PARTICLE_FOR: Partial<Record<InteractionKind, ParticleKind>> = {
   stroke: 'heart',
   nudge: 'heart',
   walk: 'heart',
-  outside: 'sun',
   shake: 'thorn',
   jolt: 'thorn',
 };
@@ -53,6 +54,7 @@ const newMark = () => `Specimen No. ${String(Math.floor(Math.random() * 9000) + 
 
 export default function GameScreen() {
   const fontsLoaded = useGameFonts();
+  const router = useRouter();
 
   const [state, dispatch] = useReducer(reducer, undefined, freshState);
   const [hydrated, setHydrated] = useState(false);
@@ -63,15 +65,25 @@ export default function GameScreen() {
   const [shakeKey, setShakeKey] = useState(0);
   const [pinchKey, setPinchKey] = useState(0);
   const [devOpen, setDevOpen] = useState(false);
+  /** Only for the hidden dev panel - see `CameraLightSensor`'s `onDebug`. */
+  const [cameraStatus, setCameraStatus] = useState<CameraLightStatus>('pending');
+  const [cameraDebug, setCameraDebug] = useState<CameraDebugInfo | null>(null);
   /** Live pupil offset while a finger drags on the stage but off the plant. */
   const { eyeX, eyeY, trackEyes, releaseEyes } = useEyeTracking();
+  /** The glow that follows the finger anywhere on the stage. */
+  const { auraX, auraY, auraOpacity, auraKind, showAura, moveAura, startAuraHold, hideAura } =
+    useFingerAura();
   const [mark, setMark] = useState(newMark);
   /** Shown between the title card and actually starting - see `beginRun`. */
   const [showTutorial, setShowTutorial] = useState(false);
+  /** Reopens the gesture tutorial mid-run, without touching game state. */
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Evil takeover
   const [notifs, setNotifs] = useState<FakeNotif[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  /** The bad ending's camera photo, after the player taps Allow. */
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [glitching, setGlitching] = useState(false);
   const [sheetUp, setSheetUp] = useState(false);
 
@@ -126,6 +138,20 @@ export default function GameScreen() {
     if (hydrated) saveState(state);
   }, [state, hydrated]);
 
+  // Records the run in the gallery the moment it's actually over.
+  // `appendHistory` de-dupes by mark, so this firing again on a reload of an
+  // already-finished run is harmless.
+  useEffect(() => {
+    if (!hydrated || !state.ending) return;
+    appendHistory({
+      mark,
+      ending: state.ending,
+      latin: ENDINGS[state.ending].latin,
+      scores: state.scores,
+      date: Date.now(),
+    });
+  }, [hydrated, state.ending, state.scores, mark]);
+
   /* ---------------- derived ---------------- */
 
   const tendency = useMemo(
@@ -134,8 +160,8 @@ export default function GameScreen() {
   );
   const form: EndingKind | null = state.ending ?? (state.level >= 4 ? tendency : null);
   const palette = useMemo(
-    () => paletteFor(state.level, state.env, tendency, state.ending),
-    [state.level, state.env, tendency, state.ending]
+    () => paletteFor(state.level, state.env, tendency, state.ending, state.legacy),
+    [state.level, state.env, tendency, state.ending, state.legacy]
   );
 
   const totalScore =
@@ -156,14 +182,27 @@ export default function GameScreen() {
 
   /* ---------------- the ending ---------------- */
 
-  const closeDialog = useCallback(() => {
-    setDialogOpen(false);
-    if (dialogResolved.current) return;
-    dialogResolved.current = true;
+  /** The end of the bad ending's theatrics: back to normal, then the verdict. */
+  const concludeEnding = useCallback(() => {
+    setPhotoOpen(false);
     setGlitching(false);
     setWhisper('it was only a game.');
     after(900, () => setSheetUp(true));
   }, [after]);
+
+  /** `allowed` is only true when the player actually tapped Allow - that's
+   *  what opens the camera. The safety-net timer closes it with `false`, so
+   *  a player who never engaged with the dialog is never photographed. */
+  const closeDialog = useCallback(
+    (allowed: boolean) => {
+      setDialogOpen(false);
+      if (dialogResolved.current) return;
+      dialogResolved.current = true;
+      if (allowed) setPhotoOpen(true);
+      else concludeEnding();
+    },
+    [concludeEnding]
+  );
 
   /** The scripted reveal. Driven by timers, so it never runs during render. */
   const runFinale = useCallback(
@@ -220,7 +259,7 @@ export default function GameScreen() {
         });
       }
       // Safety net: if nobody taps Allow, the run still resolves itself.
-      after(9500, closeDialog);
+      after(9500, () => closeDialog(false));
     },
     [after, closeDialog]
   );
@@ -305,49 +344,31 @@ export default function GameScreen() {
   );
 
   const { status: lightSensorStatus, lux } = useAmbientLight(active, onLightEnv);
+  const luxRef = useRef(lux);
+  useEffect(() => {
+    luxRef.current = lux;
+  });
 
-  // Only fall back to the camera once we actually know there's no LightSensor
-  // - 'checking' means the async probe hasn't resolved yet, and mounting the
-  // camera (and prompting for its permission) during that window would ask
-  // Android users for a permission the real sensor never needed.
-  const [cameraStatus, setCameraStatus] = useState<CameraLightStatus>('pending');
-  const [cameraLuma, setCameraLuma] = useState<number | null>(null);
-  const cameraEnabled = active && lightSensorStatus === 'unavailable';
+  // The camera runs once we know which kind of phone this is - 'checking'
+  // means the async probe hasn't resolved yet, and mounting it (and asking
+  // for its permission) mid-probe could flash a prompt for nothing.
+  //  - No LightSensor (iPhone, some Androids): the camera is also the room's
+  //    light meter ('ambient').
+  //  - A real LightSensor (many Androids): that sensor keeps deciding day and
+  //    night, and the camera only watches for a finger over the lens
+  //    ('cover-only'). This does mean asking those players for the camera,
+  //    deliberately - it's what makes covering it put the plant to sleep.
+  const cameraEnabled = active && lightSensorStatus !== 'checking';
+  const cameraMode = lightSensorStatus === 'available' ? 'cover-only' : 'ambient';
 
-  const lightSource: 'sensor' | 'camera' | 'manual' =
-    lightSensorStatus === 'available' ? 'sensor' : cameraStatus === 'active' ? 'camera' : 'manual';
-  const lightReading = lightSource === 'sensor' ? lux : lightSource === 'camera' ? cameraLuma : null;
+  /** A covering just ended in cover-only mode: put the room back to what the
+   *  real light sensor reads, which never stopped measuring. */
+  const onUncovered = useCallback(() => {
+    const reading = luxRef.current;
+    onLightEnv(reading !== null && reading <= LIGHT.darkLux ? 'dark' : 'day');
+  }, [onLightEnv]);
 
-  const { check: checkOutside, busy: outsideBusy } = useOutside();
-
-  const onOutside = useCallback(async () => {
-    const result = await checkOutside();
-    // The whisper is set first, then the interaction overwrites it only when
-    // it has something better to say than the location read-out.
-    switch (result.kind) {
-      case 'moved':
-        interact('outside');
-        setWhisper(`${Math.round(result.metres)} m from home. It has never felt this much sky.`);
-        break;
-      case 'anchored':
-        interact('daylight');
-        setWhisper('Noted where you started. Carry it outside and tap again.');
-        break;
-      case 'too-close':
-        interact('daylight');
-        setWhisper('Still the same room. It can tell.');
-        break;
-      case 'checkin':
-        interact('outside');
-        setWhisper('No location. Taking your word for it: outside.');
-        break;
-    }
-  }, [checkOutside, interact]);
-
-  const toggleEnv = useCallback(() => {
-    if (!active) return;
-    interact(state.env === 'day' ? 'nightfall' : 'daylight');
-  }, [active, state.env, interact]);
+  const openGallery = useCallback(() => router.push('/gallery'), [router]);
 
   /** Actually begins gameplay, dismissing the title card and tutorial alike. */
   const beginRun = useCallback(() => {
@@ -364,12 +385,14 @@ export default function GameScreen() {
       cancelHaunting();
       setNotifs([]);
       setDialogOpen(false);
+      setPhotoOpen(false);
       setGlitching(false);
       setSheetUp(false);
       setBurst(null);
       setMood('idle');
       setDevOpen(false);
       setShowTutorial(false);
+      setHelpOpen(false);
       dialogResolved.current = false;
       setMark(newMark());
 
@@ -422,6 +445,7 @@ export default function GameScreen() {
           latin={latin}
           stageName={stageName}
           goal={goal}
+          generation={state.generation}
           onSecretHold={() => setDevOpen((v) => !v)}
         />
 
@@ -429,12 +453,11 @@ export default function GameScreen() {
           palette={palette}
           evil={evil}
           env={state.env}
-          source={lightSource}
-          reading={lightReading}
-          onToggleEnv={toggleEnv}
           shakeKey={shakeKey}
           onRestart={confirmRestart}
-          restartDisabled={!active}>
+          restartDisabled={!active}
+          onOpenGallery={openGallery}
+          onOpenHelp={() => setHelpOpen(true)}>
           <Plant
             level={state.level}
             mood={displayMood}
@@ -459,9 +482,16 @@ export default function GameScreen() {
             onStroke={() => interact('stroke')}
             onShake={() => interact('shake')}
             onPinch={onPlantPinch}
+            onWater={() => interact('water')}
+            onSun={() => interact('sun')}
             onTrackEyes={trackEyes}
             onReleaseEyes={releaseEyes}
+            onAuraShow={showAura}
+            onAuraMove={moveAura}
+            onAuraHold={startAuraHold}
+            onAuraHide={hideAura}
           />
+          <FingerAura auraX={auraX} auraY={auraY} auraOpacity={auraOpacity} auraKind={auraKind} />
         </Stage>
 
         <Animated.Text
@@ -473,23 +503,23 @@ export default function GameScreen() {
         </Animated.Text>
 
         <Progress palette={palette} evil={evil} level={state.level} count={state.count} />
-
-        <Actions
-          palette={palette}
-          evil={evil}
-          disabled={finished}
-          onTap={(kind: TapKind) => interact(kind)}
-          onOutside={onOutside}
-          outsideBusy={outsideBusy}
-          outsideDone={state.wentOutside}
-        />
       </SafeAreaView>
 
       <CameraLightSensor
         enabled={cameraEnabled}
+        mode={cameraMode}
+        onUncovered={onUncovered}
         onEnvChange={onLightEnv}
-        onStatus={setCameraStatus}
-        onBrightness={setCameraLuma}
+        onStatus={(status) => {
+          console.log('[camera] status:', status);
+          setCameraStatus(status);
+        }}
+        onBrightness={() => {}}
+        onSleep={() => interact('sleep')}
+        onDebug={(info) => {
+          console.log('[camera]', info);
+          setCameraDebug(info);
+        }}
       />
 
       <GlitchOverlay active={glitching} />
@@ -497,7 +527,8 @@ export default function GameScreen() {
         items={notifs}
         onDismiss={(id) => setNotifs((prev) => prev.filter((n) => n.id !== id))}
       />
-      <FakePermissionDialog visible={dialogOpen} onClose={closeDialog} />
+      <FakePermissionDialog visible={dialogOpen} onClose={() => closeDialog(true)} />
+      {photoOpen ? <EvilPhotoBooth onDone={concludeEnding} /> : null}
 
       <EndingSheet
         palette={palette}
@@ -506,18 +537,21 @@ export default function GameScreen() {
         visible={sheetUp}
         scores={state.scores}
         onRestart={() => hardReset()}
+        onOpenGallery={openGallery}
       />
 
       <IntroOverlay
         palette={palette}
         visible={!state.started && !showTutorial}
+        legacy={state.legacy}
         onStart={() => setShowTutorial(true)}
       />
 
       <TutorialOverlay
         palette={palette}
-        visible={!state.started && showTutorial}
-        onFinish={beginRun}
+        visible={(!state.started && showTutorial) || helpOpen}
+        mode={helpOpen ? 'help' : 'onboarding'}
+        onFinish={helpOpen ? () => setHelpOpen(false) : beginRun}
       />
 
       <DevPanel
@@ -526,6 +560,9 @@ export default function GameScreen() {
         onForce={(ending) => hardReset({ force: ending })}
         onReset={() => hardReset()}
         onClose={() => setDevOpen(false)}
+        lightSensorStatus={lightSensorStatus}
+        cameraStatus={cameraStatus}
+        cameraDebug={cameraDebug}
       />
     </View>
   );

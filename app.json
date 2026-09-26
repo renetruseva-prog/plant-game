@@ -39,12 +39,6 @@
         }
       ],
       [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Specimen uses your location only to tell whether you carried it outside."
-        }
-      ],
-      [
         "expo-sensors",
         {
           "motionPermission": "Specimen reacts when you walk with it or shake it."
@@ -54,9 +48,10 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Specimen reads brightness from the camera to tell whether your room is light or dark. No photos are saved or sent anywhere."
+          "cameraPermission": "Specimen reads brightness from the camera to tell whether your room is light or dark. In one ending it also takes a photo of you to show on screen. Photos are never saved or sent anywhere."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

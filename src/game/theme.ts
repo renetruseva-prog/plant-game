@@ -154,11 +154,32 @@ export const CACTUS_PALETTE: Palette = {
 
 const DARK_STAGE = { stageTop: '#1A2644', stageBottom: '#0D1526' };
 
+function hexToRgb(hex: string): [number, number, number] {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+/** Blends two hex colours; `t` of 0 is `a`, 1 is `b`. */
+function mixHex(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = hexToRgb(a);
+  const [br, bg, bb] = hexToRgb(b);
+  const mix = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+  return `#${mix(ar, br)}${mix(ag, bg)}${mix(ab, bb)}`;
+}
+
+/** How strongly a legacy specimen's ending tints a fresh one's early levels -
+ *  a hint, not a repeat of the previous run's palette. */
+const LEGACY_TINT_STRENGTH = 0.22;
+
 export function paletteFor(
   level: number,
   env: Env,
   tendency: EndingKind | null,
-  ending: EndingKind | null
+  ending: EndingKind | null,
+  /** The previous specimen's ending - purely a level-1-3 flavour cue, see
+   *  `GameState.legacy`. Defaulted so existing callers (the gallery, which
+   *  has no "previous run" of its own) don't need to pass it. */
+  legacy: EndingKind | null = null
 ): Palette {
   if (ending === 'bad') return EVIL_PALETTE;
   if (ending === 'fell') return FALL_PALETTE;
@@ -166,6 +187,18 @@ export function paletteFor(
   if (ending === 'cactus') return CACTUS_PALETTE;
 
   let p = { ...BY_LEVEL[Math.min(level, 5) - 1] };
+
+  // A faint echo of the last specimen, before this one's own trajectory
+  // (from level 4, via `tendency`) has anything to say for itself.
+  if (level < 4 && !ending && legacy) {
+    const tint = TENDENCY_TINT[legacy];
+    if (tint.accent) p = { ...p, accent: mixHex(p.accent, tint.accent, LEGACY_TINT_STRENGTH) };
+    if (tint.stageTop) p = { ...p, stageTop: mixHex(p.stageTop, tint.stageTop, LEGACY_TINT_STRENGTH) };
+    if (tint.stageBottom) {
+      p = { ...p, stageBottom: mixHex(p.stageBottom, tint.stageBottom, LEGACY_TINT_STRENGTH) };
+    }
+  }
+
   if (level >= 4 && tendency) p = { ...p, ...TENDENCY_TINT[tendency] };
   if (ending === 'good') {
     p = { ...p, accent: '#E8B33A', stageTop: '#E3EDC6', stageBottom: '#FAF8E6' };

@@ -1,11 +1,25 @@
+
+
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { FINAL_COUNT, THRESHOLDS, applyWeights, endingOf, levelFor } from './config';
 import type { EndingKind, GameState, InteractionKind, Scores } from './types';
 
 const STORAGE_KEY = 'specimen.state.v1';
-/** Anchor location for the "outside" check, kept across runs of the same device. */
-export const ANCHOR_KEY = 'specimen.anchor.v1';
+
+const HISTORY_KEY = 'specimen.history.v1';
+/** Past specimens kept for the gallery; oldest entries drop off past this. */
+const HISTORY_LIMIT = 50;
+
+/** One finished run, as kept for the gallery. */
+export type HistoryEntry = {
+  mark: string;
+  ending: EndingKind;
+  latin: string;
+  scores: Scores;
+  /** `Date.now()` when the run finished. */
+  date: number;
+};
 
 const ZERO_SCORES: Scores = { care: 0, light: 0, attention: 0, roughness: 0 };
 
@@ -17,9 +31,9 @@ const ZERO_COUNTS: Record<InteractionKind, number> = {
   walk: 0,
   nudge: 0,
   jolt: 0,
-  outside: 0,
   daylight: 0,
   nightfall: 0,
+  sleep: 0,
 };
 
 export function freshState(): GameState {
@@ -30,8 +44,9 @@ export function freshState(): GameState {
     level: 1,
     ending: null,
     env: 'day',
-    wentOutside: false,
     started: false,
+    generation: 1,
+    legacy: null,
   };
 }
 
@@ -59,7 +74,20 @@ export function reducer(state: GameState, action: Action): GameState {
       return { ...state, started: true };
 
     case 'reset':
-      return { ...freshState(), started: true };
+      // `started: false` - not `true` - so the intro card and tutorial run
+      // again on every new specimen, the same as a first launch (skippable
+      // either way). Only `devJump`/`devForce` skip straight past them, for
+      // quick testing from the hidden dev panel.
+      //
+      // `generation`/`legacy` are purely cosmetic continuity, not a scoring
+      // effect - see `GameState`. A previous run abandoned mid-way (no
+      // `ending` yet) leaves the existing lineage untouched rather than
+      // erasing it.
+      return {
+        ...freshState(),
+        generation: state.generation + 1,
+        legacy: state.ending ?? state.legacy,
+      };
 
     case 'setEnv':
       if (state.ending) return state;
@@ -76,7 +104,6 @@ export function reducer(state: GameState, action: Action): GameState {
         counts: { ...state.counts, [kind]: state.counts[kind] + 1 },
         scores,
         level: levelFor(count),
-        wentOutside: state.wentOutside || kind === 'outside',
         // A light interaction also moves the room into that state.
         env: kind === 'nightfall' ? 'dark' : kind === 'daylight' || kind === 'sun' ? 'day' : state.env,
       };
@@ -155,5 +182,52 @@ export async function clearState() {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
+  }
+}
+
+export async function loadHistory(): Promise<HistoryEntry[]> {
+  try {
+    const raw = await AsyncStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Records a finished run for the gallery, newest first. De-duped by `mark`
+ * so it's safe to call more than once for the same run - e.g. once when the
+ * ending is first reached, and again if the app is reopened on that same
+ * finished state before the player starts a new one.
+ */
+export async function appendHistory(entry: HistoryEntry) {
+  try {
+    const list = await loadHistory();
+    if (list.some((h) => h.mark === entry.mark)) return;
+    const next = [entry, ...list].slice(0, HISTORY_LIMIT);
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // Persistence is a nicety; never let it break a live demo.
+  }
+}
+
+/** Deletes one specimen from the gallery, by its mark. */
+export async function deleteHistory(mark: string) {
+  try {
+    const list = await loadHistory();
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(list.filter((h) => h.mark !== mark)));
+  } catch {
+    // Persistence is a nicety; never let it break a live demo.
+  }
+}
+
+/** Deletes every specimen in the gallery. */
+export async function deleteAllHistory() {
+  try {
+    await AsyncStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // Persistence is a nicety; never let it break a live demo.
   }
 }

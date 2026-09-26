@@ -1,6 +1,18 @@
 import Svg, { Circle, Path } from 'react-native-svg';
 
-export type IconKind = 'water' | 'sun' | 'stroke' | 'shake' | 'walk' | 'moon' | 'outside';
+export type IconKind =
+  | 'water'
+  | 'sun'
+  | 'stroke'
+  | 'shake'
+  | 'walk'
+  | 'moon'
+  | 'gallery'
+  | 'help'
+  | 'back'
+  | 'close'
+  | 'skip'
+  | 'trash';
 
 /**
  * The whole line-icon set, shared between the action buttons and the
@@ -49,11 +61,46 @@ export function ActionIcon({ kind, color, size = 28 }: { kind: IconKind; color: 
           <Path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" {...p} />
         </Svg>
       );
-    case 'outside':
+    case 'gallery':
+      // A small pressed specimen behind glass: the herbarium framing.
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
-          <Path d="M12 21s-7-4.6-7-11a7 7 0 0 1 14 0c0 6.4-7 11-7 11z" {...p} />
-          <Circle cx={12} cy={10} r={2.4} {...p} />
+          <Path d="M4 4h16v16H4z" {...p} />
+          <Path d="M8 16c0-5 2-7 4-9 2 2 4 4 4 9" {...p} />
+        </Svg>
+      );
+    case 'help':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Circle cx={12} cy={12} r={9} {...p} />
+          <Path d="M9.3 9.4a2.7 2.7 0 1 1 4 2.3c-1 .6-1.3 1.1-1.3 2.1" {...p} />
+          <Circle cx={12} cy={17.3} r={0.9} fill={color} stroke="none" />
+        </Svg>
+      );
+    case 'back':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M15 5l-7 7 7 7" {...p} />
+        </Svg>
+      );
+    case 'close':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M6 6l12 12M18 6L6 18" {...p} />
+        </Svg>
+      );
+    case 'trash':
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6" {...p} />
+        </Svg>
+      );
+    case 'skip':
+      // Skip-forward: a play triangle running into a bar.
+      return (
+        <Svg width={size} height={size} viewBox="0 0 24 24">
+          <Path d="M6 5l10 7-10 7z" {...p} />
+          <Path d="M19 5v14" {...p} />
         </Svg>
       );
   }

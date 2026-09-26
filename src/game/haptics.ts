@@ -17,6 +17,7 @@ export function hapticFor(kind: InteractionKind) {
       return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
     case 'sun':
     case 'daylight':
+    case 'sleep':
       return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Soft));
     case 'stroke':
     case 'nudge':
@@ -29,7 +30,6 @@ export function hapticFor(kind: InteractionKind) {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       });
     case 'walk':
-    case 'outside':
       return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
     default:
       return run(() => Haptics.selectionAsync());

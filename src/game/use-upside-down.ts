@@ -1,5 +1,5 @@
 import { Accelerometer } from 'expo-sensors';
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { useSharedValue, type SharedValue } from 'react-native-reanimated';
 
 import { FALL } from './config';
@@ -29,10 +29,8 @@ import { FALL } from './config';
 export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle: SharedValue<number> } {
   const fallAngle = useSharedValue(0);
 
-  const onFallRef = useRef(onFall);
-  useEffect(() => {
-    onFallRef.current = onFall;
-  });
+  // Always calls the newest `onFall`, without the subscription restarting.
+  const emitFall = useEffectEvent(onFall);
 
   useEffect(() => {
     if (!enabled) return;
@@ -93,7 +91,7 @@ export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle
           lastFlipped = now;
           if (now - flippedSince >= FALL.holdMs) {
             fired = true;
-            onFallRef.current();
+            emitFall();
           }
         } else if (flippedSince !== null && now - lastFlipped > FALL.graceMs) {
           flippedSince = null;

@@ -7,8 +7,6 @@ import { useAmbientLight } from './use-ambient-light';
 import { useMotion } from './use-motion';
 import { useUpsideDown } from './use-upside-down';
 
-const noop = () => {};
-
 /**
  * Everything the phone itself feeds into the game: walking and shaking, being
  * turned upside down, the room's light, and the camera. Each is turned into
@@ -49,7 +47,6 @@ export function useDeviceInput() {
     mode: lightSensorStatus === 'available' ? ('cover-only' as const) : ('ambient' as const),
     onEnvChange: onLightEnv,
     onStatus: setCameraStatus,
-    onBrightness: noop,
     onSleep: () => interact('sleep'),
     // A covering just ended in cover-only mode: put the room back to what the
     // real light sensor reads, which never stopped measuring.

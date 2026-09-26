@@ -8,7 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
-import { ENDINGS, LEGACY_INTRO } from '@/game/copy';
+import { ENDINGS, LEGACY_INTRO, STAT_ROWS } from '@/game/copy';
 import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 import type { EndingKind, Scores } from '@/game/types';
@@ -73,13 +73,6 @@ export function IntroOverlay({
     </Animated.View>
   );
 }
-
-const STAT_ROWS: [keyof Scores, string][] = [
-  ['care', 'Care'],
-  ['light', 'Light'],
-  ['attention', 'Attention'],
-  ['roughness', 'Rough'],
-];
 
 export function EndingSheet({
   palette,

@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 // The legacy API: the promise-based calls always work in Expo Go, unlike the
 // newer synchronous File classes (see the same choice in `gallery.tsx`).
 import * as FileSystem from 'expo-file-system/legacy';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
@@ -41,32 +41,28 @@ export function EvilPhotoBooth({ onDone }: { onDone: () => void }) {
   const savedUriRef = useRef<string | null>(null);
   const flash = useSharedValue(0);
 
-  const onDoneRef = useRef(onDone);
-  const permissionRef = useRef({ permission, requestPermission });
-  useEffect(() => {
-    onDoneRef.current = onDone;
-    permissionRef.current = { permission, requestPermission };
+  const showTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Always call the newest `onDone`, and read the newest permission state,
+  // without the effects below restarting whenever either changes.
+  const finish = useEffectEvent(onDone);
+  const askPermission = useEffectEvent(async () => {
+    if (permission?.granted) return true;
+    try {
+      return (await requestPermission()).granted;
+    } catch {
+      return false;
+    }
   });
 
   // Asks for the real permission, then opens the camera.
   useEffect(() => {
     let cancelled = false;
-
-    (async () => {
-      const { permission: current, requestPermission: request } = permissionRef.current;
-      let granted = current?.granted ?? false;
-      if (!granted) {
-        try {
-          granted = (await request()).granted;
-        } catch {
-          granted = false;
-        }
-      }
+    askPermission().then((granted) => {
       if (cancelled) return;
       if (granted) setPhase('camera');
-      else onDoneRef.current();
-    })();
-
+      else finish();
+    });
     return () => {
       cancelled = true;
     };
@@ -78,7 +74,7 @@ export function EvilPhotoBooth({ onDone }: { onDone: () => void }) {
     let cancelled = false;
 
     const bail = setTimeout(() => {
-      if (!cancelled) onDoneRef.current();
+      if (!cancelled) finish();
     }, CAPTURE_TIMEOUT_MS);
 
     const shutter = setTimeout(async () => {
@@ -101,8 +97,12 @@ export function EvilPhotoBooth({ onDone }: { onDone: () => void }) {
         flash.value = withTiming(0, { duration: 500 });
         setUri(source);
         setPhase('photo');
+        // The photo stays for exactly `SHOW_MS`. Started here, at the moment
+        // it appears, and owned by a ref rather than this effect - the phase
+        // change would otherwise run this effect's cleanup and cancel it.
+        showTimerRef.current = setTimeout(() => finish(), SHOW_MS);
       } catch {
-        if (!cancelled) onDoneRef.current();
+        if (!cancelled) finish();
       }
     }, SETTLE_MS);
 
@@ -113,18 +113,10 @@ export function EvilPhotoBooth({ onDone }: { onDone: () => void }) {
     };
   }, [phase, ready, flash]);
 
-  // Once the photo is up, it stays for exactly `SHOW_MS`. Its own effect, so
-  // the phase change that brings the photo on screen can't tear this timer
-  // down through the capture effect's cleanup above.
-  useEffect(() => {
-    if (phase !== 'photo') return;
-    const timer = setTimeout(() => onDoneRef.current(), SHOW_MS);
-    return () => clearTimeout(timer);
-  }, [phase]);
-
-  // Never keep the photo around once the booth is gone.
+  // Never keep the photo, or its timer, around once the booth is gone.
   useEffect(
     () => () => {
+      if (showTimerRef.current) clearTimeout(showTimerRef.current);
       if (savedUriRef.current) FileSystem.deleteAsync(savedUriRef.current, { idempotent: true }).catch(() => {});
     },
     []

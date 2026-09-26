@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { CAMERA_LIGHT } from '@/game/config';
@@ -33,7 +33,6 @@ type Props = {
   enabled: boolean;
   onEnvChange: (env: Env) => void;
   onStatus: (status: CameraLightStatus) => void;
-  onBrightness: (luma: number | null) => void;
   /** Fired once per covering, once the frame has looked like a finger over
    *  the lens (see `looksCovered`) for `coveredHoldTicks` samples in a row -
    *  not merely because the room happens to be dark. */
@@ -83,7 +82,6 @@ export function CameraLightSensor({
   enabled,
   onEnvChange,
   onStatus,
-  onBrightness,
   onSleep,
   onUncovered,
   mode = 'ambient',
@@ -115,22 +113,14 @@ export function CameraLightSensor({
    *  lens uncovers again. */
   const sleepFired = useRef(false);
 
-  const onEnvChangeRef = useRef(onEnvChange);
-  const onStatusRef = useRef(onStatus);
-  const onBrightnessRef = useRef(onBrightness);
-  const onSleepRef = useRef(onSleep);
-  const onDebugRef = useRef(onDebug);
-  const onUncoveredRef = useRef(onUncovered);
-  const modeRef = useRef(mode);
-  useEffect(() => {
-    onEnvChangeRef.current = onEnvChange;
-    onStatusRef.current = onStatus;
-    onBrightnessRef.current = onBrightness;
-    onSleepRef.current = onSleep;
-    onDebugRef.current = onDebug;
-    onUncoveredRef.current = onUncovered;
-    modeRef.current = mode;
-  });
+  // Always call the newest callbacks and read the newest mode, without the
+  // permission and sampling effects below restarting whenever they change.
+  const emitEnv = useEffectEvent(onEnvChange);
+  const emitStatus = useEffectEvent(onStatus);
+  const emitSleep = useEffectEvent(onSleep);
+  const emitUncovered = useEffectEvent(() => onUncovered?.());
+  const emitDebug = useEffectEvent((info: CameraDebugInfo) => onDebug?.(info));
+  const currentMode = useEffectEvent(() => mode);
 
   // Ask for permission once, lazily, only once the run actually needs it -
   // never at cold start, before the player has even tapped Start.
@@ -138,24 +128,24 @@ export function CameraLightSensor({
     if (!enabled || requestedRef.current || !permission) return;
     if (permission.granted) return;
     if (!permission.canAskAgain) {
-      onStatusRef.current('unavailable');
+      emitStatus('unavailable');
       return;
     }
     requestedRef.current = true;
     requestPermission().then((next) => {
-      if (!next.granted) onStatusRef.current('unavailable');
+      if (!next.granted) emitStatus('unavailable');
     });
   }, [enabled, permission, requestPermission]);
 
   useEffect(() => {
     if (!enabled || !permission?.granted || !ready) {
       if (enabled && permission && !permission.granted && permission.canAskAgain === false) {
-        onStatusRef.current('unavailable');
+        emitStatus('unavailable');
       }
       return;
     }
 
-    onStatusRef.current('active');
+    emitStatus('active');
 
     if (!sizedRef.current && cameraRef.current) {
       sizedRef.current = true;
@@ -199,17 +189,16 @@ export function CameraLightSensor({
         const saved = await ref.savePictureAsync({ base64: true, quality: CAMERA_LIGHT.jpegQuality });
         if (cancelled) return;
         if (!saved.base64) {
-          onDebugRef.current?.({ kind: 'error', message: 'savePictureAsync returned no base64' });
+          emitDebug({ kind: 'error', message: 'savePictureAsync returned no base64' });
           return;
         }
 
         const stats = frameStatsFromBase64Jpeg(saved.base64);
         if (stats === null) {
-          onDebugRef.current?.({ kind: 'error', message: 'JPEG decode failed' });
+          emitDebug({ kind: 'error', message: 'JPEG decode failed' });
           return;
         }
         const { luma } = stats;
-        onBrightnessRef.current(luma);
 
         // Checked before the baseline below is updated, so a covered reading
         // never gets to count as evidence of the room's normal brightness.
@@ -229,7 +218,7 @@ export function CameraLightSensor({
           coveredStreak.current += 1;
           if (!sleepFired.current && coveredStreak.current >= CAMERA_LIGHT.coveredHoldTicks) {
             sleepFired.current = true;
-            onSleepRef.current();
+            emitSleep();
             // Covering the lens should visibly put the plant to sleep the
             // moment it's detected, not whenever the separate smoothed
             // day/night median below happens to agree - that's a several-
@@ -237,7 +226,7 @@ export function CameraLightSensor({
             // wait on.
             if (lastEnv.current !== 'dark') {
               lastEnv.current = 'dark';
-              onEnvChangeRef.current('dark');
+              emitEnv('dark');
             }
           }
         } else {
@@ -247,17 +236,17 @@ export function CameraLightSensor({
           // fingertip.
           if (sleepFired.current) {
             recentLumas.current = [];
-            onUncoveredRef.current?.();
+            emitUncovered();
             // Nothing else here decides day/night in cover-only mode, so
             // forget that it was forced dark - the next covering has to be
             // able to force it again.
-            if (modeRef.current === 'cover-only') lastEnv.current = null;
+            if (currentMode() === 'cover-only') lastEnv.current = null;
           }
           coveredStreak.current = 0;
           sleepFired.current = false;
         }
 
-        onDebugRef.current?.({
+        emitDebug({
           kind: 'reading',
           ...stats,
           baseline: baselineLuma.current,
@@ -272,7 +261,7 @@ export function CameraLightSensor({
         if (isCovered) return;
 
         // With a real light sensor doing that job, the camera stops here.
-        if (modeRef.current === 'cover-only') return;
+        if (currentMode() === 'cover-only') return;
 
         recentLumas.current = [...recentLumas.current, luma].slice(-CAMERA_LIGHT.smoothingWindow);
         const smoothed = medianOf(recentLumas.current);
@@ -285,11 +274,11 @@ export function CameraLightSensor({
               : null;
         if (next && next !== lastEnv.current) {
           lastEnv.current = next;
-          onEnvChangeRef.current(next);
+          emitEnv(next);
         }
       } catch (e) {
         // One missed frame doesn't matter; the next tick tries again.
-        onDebugRef.current?.({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
+        emitDebug({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
       } finally {
         if (!cancelled) timer = setTimeout(tick, CAMERA_LIGHT.intervalMs);
       }

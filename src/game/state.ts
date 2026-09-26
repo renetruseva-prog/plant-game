@@ -70,7 +70,11 @@ export function reducer(state: GameState, action: Action): GameState {
       return { ...state, started: true };
 
     case 'reset':
-      return { ...freshState(), started: true };
+      // `started: false` - not `true` - so the intro card and tutorial run
+      // again on every new specimen, the same as a first launch (skippable
+      // either way). Only `devJump`/`devForce` skip straight past them, for
+      // quick testing from the hidden dev panel.
+      return freshState();
 
     case 'setEnv':
       if (state.ending) return state;

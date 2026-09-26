@@ -75,6 +75,8 @@ export default function GameScreen() {
   const [mark, setMark] = useState(newMark);
   /** Shown between the title card and actually starting - see `beginRun`. */
   const [showTutorial, setShowTutorial] = useState(false);
+  /** Reopens the gesture tutorial mid-run, without touching game state. */
+  const [helpOpen, setHelpOpen] = useState(false);
 
   // Evil takeover
   const [notifs, setNotifs] = useState<FakeNotif[]>([]);
@@ -356,6 +358,7 @@ export default function GameScreen() {
       setMood('idle');
       setDevOpen(false);
       setShowTutorial(false);
+      setHelpOpen(false);
       dialogResolved.current = false;
       setMark(newMark());
 
@@ -505,8 +508,9 @@ export default function GameScreen() {
 
       <TutorialOverlay
         palette={palette}
-        visible={!state.started && showTutorial}
-        onFinish={beginRun}
+        visible={(!state.started && showTutorial) || helpOpen}
+        mode={helpOpen ? 'help' : 'onboarding'}
+        onFinish={helpOpen ? () => setHelpOpen(false) : beginRun}
       />
 
       <DevPanel

@@ -16,9 +16,9 @@ import { PlantPicture } from '@/components/plant/plant-picture';
 import { VIEW_H, VIEW_W } from '@/game/plant-geometry';
 import { ENDINGS } from '@/game/copy';
 import { family, useGameFonts } from '@/game/fonts';
-import { deleteAllHistory, deleteHistory, loadHistory, type HistoryEntry } from '@/game/state';
+import { useHistoryStore } from '@/store/history-store';
 import { paletteFor, type Palette } from '@/game/theme';
-import type { Scores } from '@/game/types';
+import type { HistoryEntry, Scores } from '@/game/types';
 
 /** Every destructive control in the gallery shares this one red. */
 const DELETE_RED = '#D64545';
@@ -115,13 +115,14 @@ function SpecimenCard({
 
 /**
  * The herbarium: every finished run this device has recorded, newest first.
- * Local only - see `appendHistory` in `state.ts` - with a native share sheet
+ * Local only - see the history store - with a native share sheet
  * per card rather than any kind of public/online gallery.
  */
 export default function GalleryScreen() {
   const fontsLoaded = useGameFonts();
   const router = useRouter();
-  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const history = useHistoryStore((s) => s.entries);
+  const hydrated = useHistoryStore((s) => s.hydrated);
   /** The one entry currently being rendered off-screen for export, if any -
    *  kept to a single entry rather than one hidden card per history row, so
    *  sharing doesn't pay to keep every past specimen's full-resolution art
@@ -129,16 +130,6 @@ export default function GalleryScreen() {
   const [sharing, setSharing] = useState<HistoryEntry | null>(null);
   const captureRef = useRef<Svg>(null);
   const listPalette = paletteFor(1, 'day', null, null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadHistory().then((list) => {
-      if (!cancelled) setHistory(list);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Asks first: a deleted specimen can't be brought back.
   const onDelete = useCallback((entry: HistoryEntry) => {
@@ -148,8 +139,7 @@ export default function GalleryScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          deleteHistory(entry.mark);
-          setHistory((list) => (list ? list.filter((h) => h.mark !== entry.mark) : list));
+          useHistoryStore.getState().remove(entry.mark);
         },
       },
     ]);
@@ -162,8 +152,7 @@ export default function GalleryScreen() {
         text: 'Delete all',
         style: 'destructive',
         onPress: () => {
-          deleteAllHistory();
-          setHistory([]);
+          useHistoryStore.getState().clear();
         },
       },
     ]);
@@ -259,7 +248,7 @@ export default function GalleryScreen() {
           </Text>
         </View>
 
-        {history === null ? null : history.length === 0 ? (
+        {!hydrated ? null : history.length === 0 ? (
           <View style={styles.empty}>
             <ActionIcon kind="gallery" color={listPalette.dim} size={40} />
             <Text style={[styles.emptyText, { color: listPalette.dim, fontFamily: family('body', false) }]}>

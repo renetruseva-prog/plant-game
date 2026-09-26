@@ -7,9 +7,8 @@ import { roughRatioOf } from '@/components/plant/plant-picture';
 import { ENDINGS } from '@/game/copy';
 import { family } from '@/game/fonts';
 import { VIEW_H, VIEW_W } from '@/game/plant-geometry';
-import type { HistoryEntry } from '@/game/state';
 import type { Palette } from '@/game/theme';
-import type { Scores } from '@/game/types';
+import type { HistoryEntry, Scores } from '@/game/types';
 
 const W = 720;
 const H = 1100;

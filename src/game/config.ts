@@ -150,6 +150,9 @@ export const LIGHT = {
  * subtle dimming the way a light meter would.
  */
 export const CAMERA_LIGHT = {
+  /** Time between samples. Paired with the smallest available picture size
+   *  (see the sensor), this keeps sustained sampling from warming the phone
+   *  up - decoding full-resolution frames in JS every couple of seconds did. */
   intervalMs: 1500,
   darkLuma: 55,
   brightLuma: 100,

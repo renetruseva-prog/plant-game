@@ -51,10 +51,6 @@ export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle
       const available = await Accelerometer.isAvailableAsync().catch(() => false);
       if (!available || cancelled) return;
 
-      // Mirrors the guard already used in `useMotion` - avoids a crash where
-      // the native module doesn't expose these (web, mismatched builds).
-      if (typeof Accelerometer.addListener !== 'function') return;
-
       // Deliberately doesn't call `setUpdateInterval`: that setting is
       // global to the sensor, and `useMotion` (active at the same time)
       // already configures it. Setting it again here would just fight that.

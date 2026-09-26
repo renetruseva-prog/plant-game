@@ -32,8 +32,8 @@ export const WEIGHTS: Record<InteractionKind, Partial<Scores>> = {
   walk: { attention: 3, light: 1 }, // rhythmic accelerometer pattern
   nudge: { attention: 3 }, // gentle physical movement
   jolt: { roughness: 5 }, // aggressive physical shake
-  daylight: { light: 3 }, // curtains opened or ambient light rose
-  nightfall: { care: 1 }, // curtains closed: resting is mild care, not neglect
+  daylight: { light: 3 }, // the room's light rose
+  nightfall: { care: 1 }, // the room went dark: resting is mild care, not neglect
   sleep: { light: 4, care: 1 }, // covering the camera: same reward as `sun`, earned a different way
 };
 

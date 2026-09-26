@@ -3,7 +3,6 @@ import { useShallow } from 'zustand/react/shallow';
 import { closeDialog, concludeEnding } from '@/game/finale';
 import { beginRun, newSpecimen } from '@/game/session';
 import type { Palette } from '@/game/theme';
-import type { LightSensorStatus } from '@/game/use-ambient-light';
 import { useGameStore } from '@/store/game-store';
 import { useUiStore } from '@/store/ui-store';
 
@@ -16,7 +15,6 @@ import { TutorialOverlay } from './tutorial-overlay';
 type Props = {
   palette: Palette;
   evil: boolean;
-  lightSensorStatus: LightSensorStatus;
   onOpenGallery: () => void;
 };
 
@@ -25,7 +23,7 @@ type Props = {
  * sheet, the intro and tutorial, and the hidden dev panel. Which of them is
  * showing comes from the UI store, so nothing above has to pass it down.
  */
-export function GameOverlays({ palette, evil, lightSensorStatus, onOpenGallery }: Props) {
+export function GameOverlays({ palette, evil, onOpenGallery }: Props) {
   const game = useGameStore(
     useShallow((s) => ({ started: s.started, ending: s.ending, scores: s.scores, legacy: s.legacy }))
   );
@@ -39,8 +37,6 @@ export function GameOverlays({ palette, evil, lightSensorStatus, onOpenGallery }
       showTutorial: s.showTutorial,
       helpOpen: s.helpOpen,
       devOpen: s.devOpen,
-      cameraStatus: s.cameraStatus,
-      cameraDebug: s.cameraDebug,
     }))
   );
   const { dropNotif, setShowTutorial, setHelpOpen, toggleDev } = useUiStore.getState();
@@ -82,9 +78,6 @@ export function GameOverlays({ palette, evil, lightSensorStatus, onOpenGallery }
         onForce={(ending) => newSpecimen({ force: ending })}
         onReset={() => newSpecimen()}
         onClose={toggleDev}
-        lightSensorStatus={lightSensorStatus}
-        cameraStatus={ui.cameraStatus}
-        cameraDebug={ui.cameraDebug}
       />
     </>
   );

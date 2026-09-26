@@ -1,5 +1,4 @@
 import { useGameStore } from '@/store/game-store';
-import { useUiStore } from '@/store/ui-store';
 
 import { LIGHT } from './config';
 import { fall, interact } from './interact';
@@ -31,8 +30,6 @@ export function useDeviceInput() {
   };
   const { status: lightSensorStatus, getLux } = useAmbientLight(active, onLightEnv);
 
-  const { setCameraStatus, setCameraDebug } = useUiStore.getState();
-
   // The camera runs once we know which kind of phone this is - 'checking'
   // means the async probe hasn't resolved yet, and mounting it (and asking
   // for its permission) mid-probe could flash a prompt for nothing.
@@ -46,7 +43,6 @@ export function useDeviceInput() {
     enabled: active && lightSensorStatus !== 'checking',
     mode: lightSensorStatus === 'available' ? ('cover-only' as const) : ('ambient' as const),
     onEnvChange: onLightEnv,
-    onStatus: setCameraStatus,
     onSleep: () => interact('sleep'),
     // A covering just ended in cover-only mode: put the room back to what the
     // real light sensor reads, which never stopped measuring.
@@ -54,8 +50,7 @@ export function useDeviceInput() {
       const reading = getLux();
       onLightEnv(reading !== null && reading <= LIGHT.darkLux ? 'dark' : 'day');
     },
-    onDebug: setCameraDebug,
   };
 
-  return { tilt, fallAngle, camera, lightSensorStatus };
+  return { tilt, fallAngle, camera };
 }

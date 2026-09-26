@@ -4,8 +4,6 @@ import { persist } from 'zustand/middleware';
 import { ENDINGS } from '@/game/copy';
 import { envFromClock } from '@/game/clock';
 import {
-  ZERO_COUNTS,
-  ZERO_SCORES,
   applyFall,
   applyInteraction,
   freshState,
@@ -14,16 +12,15 @@ import {
   nextSpecimen,
   runEndingAs,
 } from '@/game/rules';
-import type { EndingKind, Env, GameState, InteractionKind } from '@/game/types';
+import type { EndingKind, GameState, InteractionKind } from '@/game/types';
 
 import { useHistoryStore } from './history-store';
-import { createStorage } from './storage';
+import { storage } from './storage';
 import { useUiStore } from './ui-store';
 
 type GameActions = {
   /** Dismisses the title card and tutorial: the run begins. */
   start: () => void;
-  setEnv: (env: Env) => void;
   /** One scored interaction. Records the run in the gallery if it was the
    *  one that ended it. */
   interact: (kind: InteractionKind) => void;
@@ -46,22 +43,6 @@ export type GameStore = GameState &
     hydrated: boolean;
   };
 
-/** The part of the store that is saved. */
-const GAME_KEYS = [
-  'count',
-  'counts',
-  'scores',
-  'level',
-  'ending',
-  'env',
-  'started',
-  'generation',
-  'legacy',
-  'mark',
-] as const;
-
-type Saved = Pick<GameStore, (typeof GAME_KEYS)[number]>;
-
 /** Records a finished run in the gallery - done here, in the action that
  *  ends the run, rather than by something watching the state for it. */
 function recordEnding(state: GameState, mark: string) {
@@ -83,11 +64,6 @@ export const useGameStore = create<GameStore>()(
       hydrated: false,
 
       start: () => set({ started: true }),
-
-      setEnv: (env) => {
-        if (get().ending) return;
-        set({ env });
-      },
 
       interact: (kind) => {
         const prev = get();
@@ -118,10 +94,11 @@ export const useGameStore = create<GameStore>()(
     }),
     {
       name: 'specimen.game.v2',
+      // Must match the version already on players' phones, or the save is ignored.
       version: 1,
-      // The old code stored the bare game state under its own key.
-      storage: createStorage('specimen.state.v1', (legacy) => legacy, 1),
-      partialize: (s): Saved => ({
+      storage,
+      // Everything but the actions and the `hydrated` flag.
+      partialize: (s) => ({
         count: s.count,
         counts: s.counts,
         scores: s.scores,
@@ -133,24 +110,10 @@ export const useGameStore = create<GameStore>()(
         legacy: s.legacy,
         mark: s.mark,
       }),
-      // Backfills anything a save from an older version lacks, and picks only
-      // the keys it knows, so fields the game has since dropped don't linger.
-      merge: (persisted, current) => {
-        if (!persisted) {
-          // Nothing saved: no sensor reading yet, so seed the room from the
-          // time of day.
-          return { ...current, env: envFromClock() };
-        }
-        const p = persisted as Partial<Saved>;
-        const merged: Partial<Saved> = {};
-        for (const key of GAME_KEYS) if (p[key] !== undefined) (merged as Record<string, unknown>)[key] = p[key];
-        return {
-          ...current,
-          ...merged,
-          counts: { ...ZERO_COUNTS, ...p.counts },
-          scores: { ...ZERO_SCORES, ...p.scores },
-        };
-      },
+      // Nothing saved yet: no sensor reading either, so seed the room from
+      // the time of day.
+      merge: (persisted, current) =>
+        persisted ? { ...current, ...(persisted as object) } : { ...current, env: envFromClock() },
       onRehydrateStorage: () => (state) => {
         useGameStore.setState({ hydrated: true });
         // Returning to a finished run: show the verdict, skip the theatrics.

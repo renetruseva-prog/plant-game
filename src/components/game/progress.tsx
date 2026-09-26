@@ -71,7 +71,7 @@ export function Progress({ palette, evil, level, count }: Props) {
 
       <Text style={[styles.remain, { color: palette.dim, fontFamily: family('body', evil) }]}>
         {level < 5
-          ? `${remaining} more ${remaining === 1 ? 'touch' : 'touches'} until ${LEVELS[level].name}.`
+          ? `${remaining} more ${remaining === 1 ? 'interaction' : 'interactions'} until ${LEVELS[level].name}.`
           : 'Final form.'}
       </Text>
     </View>

@@ -1,15 +1,8 @@
 import { LightSensor } from 'expo-sensors';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useRef, useState } from 'react';
 
 import { LIGHT } from './config';
 import type { Env } from './types';
-
-/** The room is dark during these hours when there is no sensor to ask. */
-export function envFromClock(date = new Date()): Env {
-  const h = date.getHours();
-  const { from, to } = LIGHT.nightHours;
-  return h >= from || h < to ? 'dark' : 'day';
-}
 
 /**
  * `'checking'` until the async availability probe resolves, so a caller
@@ -27,13 +20,15 @@ export type LightSensorStatus = 'checking' | 'available' | 'unavailable';
  */
 export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => void) {
   const [status, setStatus] = useState<LightSensorStatus>('checking');
-  const [lux, setLux] = useState<number | null>(null);
-
-  const onChange = useRef(onEnvChange);
-  useEffect(() => {
-    onChange.current = onEnvChange;
-  });
+  // The newest reading, kept in a ref rather than state: it changes every
+  // 600ms and nothing draws it, so making it state would re-render the whole
+  // screen for no reason. Whoever needs it asks with `getLux`.
+  const lux = useRef<number | null>(null);
   const lastEnv = useRef<Env | null>(null);
+
+  // Always calls the newest `onEnvChange`, without the subscription below
+  // having to restart when it changes.
+  const emitEnv = useEffectEvent(onEnvChange);
 
   useEffect(() => {
     if (!enabled) return;
@@ -57,17 +52,20 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
 
       LightSensor.setUpdateInterval(LIGHT.intervalMs);
       sub = LightSensor.addListener(({ illuminance }) => {
-        setLux(illuminance);
+        lux.current = illuminance;
         // Hysteresis: only flip on a decisive reading, so a flickering sensor
         // can't strobe the whole interface.
         const next: Env | null =
           illuminance <= LIGHT.darkLux ? 'dark' : illuminance >= LIGHT.brightLux ? 'day' : null;
         if (next && next !== lastEnv.current) {
           lastEnv.current = next;
-          onChange.current(next);
+          emitEnv(next);
         }
       });
-    })();
+    })().catch(() => {
+      // Sensor exists but can't be subscribed to (e.g. web): fall back to the camera.
+      if (!cancelled) setStatus('unavailable');
+    });
 
     return () => {
       cancelled = true;
@@ -75,5 +73,5 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
     };
   }, [enabled]);
 
-  return { status, lux };
+  return { status, getLux: () => lux.current };
 }

@@ -1,4 +1,4 @@
-import type { EndingKind, InteractionKind } from './types';
+import type { EndingKind, InteractionKind, Scores } from './types';
 
 export const LEVELS = [
   { name: 'Seed', goal: 'Find out what it responds to.' },
@@ -160,3 +160,11 @@ export const LEGACY_INTRO: Record<EndingKind, string> = {
   carnivore: 'The last one stopped waiting for affection and started catching its own. This one hasn’t decided yet.',
   cactus: 'The last one toughened up until it barely needed watering at all. This one might not.',
 };
+
+/** The four scores as the player sees them, in the order they are shown. */
+export const STAT_ROWS: [keyof Scores, string][] = [
+  ['care', 'Care'],
+  ['light', 'Light'],
+  ['attention', 'Attention'],
+  ['roughness', 'Rough'],
+];

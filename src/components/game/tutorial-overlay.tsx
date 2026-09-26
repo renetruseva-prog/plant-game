@@ -5,6 +5,7 @@ import Animated, {
   Easing,
   interpolate,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -46,6 +47,8 @@ function Caption({ palette, children }: { palette: Palette; children: string }) 
 function DragDemo({ direction, icon, palette }: { direction: 'down' | 'up'; icon: IconKind; palette: Palette }) {
   const t = useSharedValue(0);
 
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.quad) }), -1, false);
   }, [t]);
@@ -85,6 +88,8 @@ function DragDemo({ direction, icon, palette }: { direction: 'down' | 'up'; icon
 function HoldDemo({ palette }: { palette: Palette }) {
   const t = useSharedValue(0);
 
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.out(Easing.quad) }), -1, false);
   }, [t]);
@@ -109,6 +114,8 @@ function HoldDemo({ palette }: { palette: Palette }) {
 function FingerShakeDemo({ palette }: { palette: Palette }) {
   const t = useSharedValue(0);
 
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 130, easing: Easing.linear }), -1, true);
   }, [t]);
@@ -132,6 +139,8 @@ function FingerShakeDemo({ palette }: { palette: Palette }) {
 function PhoneShakeDemo({ palette }: { palette: Palette }) {
   const t = useSharedValue(0);
 
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
   useEffect(() => {
     t.value = withRepeat(withTiming(1, { duration: 90, easing: Easing.linear }), -1, true);
   }, [t]);
@@ -228,7 +237,9 @@ type Props = {
  */
 export function TutorialOverlay({ palette, visible, onFinish, mode = 'onboarding' }: Props) {
   const [page, setPage] = useState(0);
-  const t = useSharedValue(visible ? 1 : 0);
+  const t = useDerivedValue(() =>
+    withTiming(visible ? 1 : 0, { duration: 400, easing: Easing.out(Easing.quad) })
+  );
 
   // Reset to page 0 the moment a fresh showing starts. Adjusting state while
   // rendering (rather than in an effect) is the supported way to react to a
@@ -239,10 +250,6 @@ export function TutorialOverlay({ palette, visible, onFinish, mode = 'onboarding
     setLastVisible(visible);
     if (visible) setPage(0);
   }
-
-  useEffect(() => {
-    t.value = withTiming(visible ? 1 : 0, { duration: 400, easing: Easing.out(Easing.quad) });
-  }, [visible, t]);
 
   const style = useAnimatedStyle(() => ({ opacity: t.value, display: t.value === 0 ? 'none' : 'flex' }));
 

@@ -4,12 +4,11 @@ import Svg, { Circle, Defs, G, LinearGradient, Rect, Stop, Text as SvgText } fro
 
 import { PlantScene } from '@/components/plant/plant-art';
 import { roughRatioOf } from '@/components/plant/plant-picture';
-import { ENDINGS } from '@/game/copy';
+import { ENDINGS, STAT_ROWS } from '@/game/copy';
 import { family } from '@/game/fonts';
 import { VIEW_H, VIEW_W } from '@/game/plant-geometry';
-import type { HistoryEntry } from '@/game/state';
 import type { Palette } from '@/game/theme';
-import type { Scores } from '@/game/types';
+import type { HistoryEntry } from '@/game/types';
 
 const W = 720;
 const H = 1100;
@@ -21,13 +20,6 @@ const PANEL_H = 360;
 /** The plant is drawn in a 300x380 box; this fits that box to the panel. */
 const PLANT_SCALE = PANEL_H / VIEW_H;
 const PLANT_X = PAD + (W - PAD * 2 - VIEW_W * PLANT_SCALE) / 2;
-
-const STAT_ROWS: [keyof Scores, string][] = [
-  ['care', 'Care'],
-  ['light', 'Light'],
-  ['attention', 'Attention'],
-  ['roughness', 'Rough'],
-];
 
 /** Crude but adequate word-wrap for SVG text, which never wraps on its own -
  *  `maxChars` is an estimate from the font size, not a measured layout. */

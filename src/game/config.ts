@@ -228,6 +228,9 @@ export const TOUCH = {
   rapidTapWindowMs: 700,
   /** Holding a finger still on the plant this long counts as a stroke, live. */
   holdDurationMs: 1200,
+  /** Once a hold has scored, it scores again this often for as long as the
+   *  finger stays down - the longer the hold, the more affection. */
+  holdRepeatMs: 600,
   /**
    * Movement past this (much smaller than `minDragForVelocity`) cancels the
    * hold-to-stroke timer. A slow, deliberate drag - pouring water is often

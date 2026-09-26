@@ -66,8 +66,8 @@ function Glyph({ kind }: { kind: ParticleKind }) {
 }
 
 function Particle({ kind, index }: { kind: ParticleKind; index: number }) {
-  const t = useSharedValue(0);
   const falls = FALLS[kind];
+  const t = useSharedValue(0);
 
   // Fixed per particle so the drift doesn't resample on every render.
   const [seed] = useState(() => ({
@@ -76,6 +76,9 @@ function Particle({ kind, index }: { kind: ParticleKind; index: number }) {
     rot: Math.random() * 120 - 60,
   }));
 
+  // Flies once when the particle mounts (the parent unmounts it afterwards).
+  // A mount-only start is a side effect; a derived value with no changing
+  // input would never run it.
   useEffect(() => {
     t.value = withDelay(
       index * 80,

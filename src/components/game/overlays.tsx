@@ -1,14 +1,13 @@
-import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
-  useSharedValue,
+  useDerivedValue,
   withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
-import { ENDINGS, LEGACY_INTRO } from '@/game/copy';
+import { ENDINGS, LEGACY_INTRO, STAT_ROWS } from '@/game/copy';
 import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 import type { EndingKind, Scores } from '@/game/types';
@@ -37,11 +36,9 @@ export function IntroOverlay({
   /** The previous specimen's ending, if this device has raised one before. */
   legacy: EndingKind | null;
 }) {
-  const t = useSharedValue(visible ? 1 : 0);
-
-  useEffect(() => {
-    t.value = withTiming(visible ? 1 : 0, { duration: 480, easing: Easing.out(Easing.quad) });
-  }, [visible, t]);
+  const t = useDerivedValue(() =>
+    withTiming(visible ? 1 : 0, { duration: 480, easing: Easing.out(Easing.quad) })
+  );
 
   // Kept mounted so it can fade out; pointer events follow `visible`.
   const style = useAnimatedStyle(() => ({ opacity: t.value, display: t.value === 0 ? 'none' : 'flex' }));
@@ -74,13 +71,6 @@ export function IntroOverlay({
   );
 }
 
-const STAT_ROWS: [keyof Scores, string][] = [
-  ['care', 'Care'],
-  ['light', 'Light'],
-  ['attention', 'Attention'],
-  ['roughness', 'Rough'],
-];
-
 export function EndingSheet({
   palette,
   evil,
@@ -98,14 +88,9 @@ export function EndingSheet({
   onRestart: () => void;
   onOpenGallery: () => void;
 }) {
-  const t = useSharedValue(0);
-
-  useEffect(() => {
-    t.value = withTiming(visible ? 1 : 0, {
-      duration: 550,
-      easing: Easing.bezier(0.2, 0.9, 0.3, 1),
-    });
-  }, [visible, t]);
+  const t = useDerivedValue(() =>
+    withTiming(visible ? 1 : 0, { duration: 550, easing: Easing.bezier(0.2, 0.9, 0.3, 1) })
+  );
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateY: (1 - t.value) * 520 }],

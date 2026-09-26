@@ -1,41 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-// The legacy API, not the new File/Paths classes: those use synchronous JSI
-// calls that aren't reliably available inside Expo Go, where this app is
-// actually run - the old promise-based bridge calls always work there.
-import * as FileSystem from 'expo-file-system/legacy';
-import * as Sharing from 'expo-sharing';
 import type Svg from 'react-native-svg';
 
 import { ActionIcon } from '@/components/game/action-icon';
 import { SpecimenCardArt } from '@/components/game/specimen-card-art';
 import { PlantPicture } from '@/components/plant/plant-picture';
 import { VIEW_H, VIEW_W } from '@/game/plant-geometry';
-import { ENDINGS } from '@/game/copy';
+import { ENDINGS, STAT_ROWS } from '@/game/copy';
 import { family, useGameFonts } from '@/game/fonts';
-import { deleteAllHistory, deleteHistory, loadHistory, type HistoryEntry } from '@/game/state';
+import { shareSpecimen } from '@/game/share-specimen';
+import { useHistoryStore } from '@/store/history-store';
 import { paletteFor, type Palette } from '@/game/theme';
-import type { Scores } from '@/game/types';
+import type { HistoryEntry } from '@/game/types';
 
 /** Every destructive control in the gallery shares this one red. */
 const DELETE_RED = '#D64545';
-
-const STAT_ROWS: [keyof Scores, string][] = [
-  ['care', 'Care'],
-  ['light', 'Light'],
-  ['attention', 'Attention'],
-  ['roughness', 'Rough'],
-];
-
-/** Text fallback for when image sharing isn't available (e.g. on web). */
-function shareTextFor(entry: HistoryEntry): string {
-  const copy = ENDINGS[entry.ending];
-  const stats = STAT_ROWS.map(([key, label]) => `${label} ${entry.scores[key]}`).join(' · ');
-  return `${entry.mark}\n${copy.title} (${copy.latin})\n${copy.body}\n\n${stats}`;
-}
 
 function formatDate(ts: number): string {
   return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
@@ -115,13 +97,14 @@ function SpecimenCard({
 
 /**
  * The herbarium: every finished run this device has recorded, newest first.
- * Local only - see `appendHistory` in `state.ts` - with a native share sheet
+ * Local only - see the history store - with a native share sheet
  * per card rather than any kind of public/online gallery.
  */
 export default function GalleryScreen() {
   const fontsLoaded = useGameFonts();
   const router = useRouter();
-  const [history, setHistory] = useState<HistoryEntry[] | null>(null);
+  const history = useHistoryStore((s) => s.entries);
+  const hydrated = useHistoryStore((s) => s.hydrated);
   /** The one entry currently being rendered off-screen for export, if any -
    *  kept to a single entry rather than one hidden card per history row, so
    *  sharing doesn't pay to keep every past specimen's full-resolution art
@@ -129,16 +112,6 @@ export default function GalleryScreen() {
   const [sharing, setSharing] = useState<HistoryEntry | null>(null);
   const captureRef = useRef<Svg>(null);
   const listPalette = paletteFor(1, 'day', null, null);
-
-  useEffect(() => {
-    let cancelled = false;
-    loadHistory().then((list) => {
-      if (!cancelled) setHistory(list);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // Asks first: a deleted specimen can't be brought back.
   const onDelete = useCallback((entry: HistoryEntry) => {
@@ -148,8 +121,7 @@ export default function GalleryScreen() {
         text: 'Delete',
         style: 'destructive',
         onPress: () => {
-          deleteHistory(entry.mark);
-          setHistory((list) => (list ? list.filter((h) => h.mark !== entry.mark) : list));
+          useHistoryStore.getState().remove(entry.mark);
         },
       },
     ]);
@@ -162,80 +134,24 @@ export default function GalleryScreen() {
         text: 'Delete all',
         style: 'destructive',
         onPress: () => {
-          deleteAllHistory();
-          setHistory([]);
+          useHistoryStore.getState().clear();
         },
       },
     ]);
   }, []);
 
-  const onShare = useCallback((entry: HistoryEntry) => {
+  // Mounts the hidden card for this specimen, waits for it to be readable as
+  // an image and opens the share sheet - all in response to the tap, so there
+  // is nothing to watch for afterwards.
+  const onShare = async (entry: HistoryEntry) => {
+    if (sharing) return;
     setSharing(entry);
-  }, []);
-
-  // Once the hidden export card for `sharing` has mounted, turn it into a PNG
-  // and open the share sheet. The native SVG view needs a moment to mount and
-  // lay out before `toDataURL` has anything to read - a single frame's wait
-  // came back empty every time - so this waits and retries.
-  //
-  // The output size is deliberately left to default. Passing an explicit
-  // `width`/`height` makes a bigger bitmap but doesn't scale the drawing to
-  // fill it - the card came out occupying about two thirds of the image,
-  // with the rest empty.
-  useEffect(() => {
-    if (!sharing) return;
-    const entry = sharing;
-    let cancelled = false;
-
-    const snapshot = () =>
-      new Promise<string | null>((resolve) => {
-        const svg = captureRef.current;
-        if (!svg) return resolve(null);
-        let settled = false;
-        const timer = setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            resolve(null);
-          }
-        }, 2500);
-        svg.toDataURL((data) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          resolve(data || null);
-        });
-      });
-
-    (async () => {
-      try {
-        let base64: string | null = null;
-        for (let attempt = 0; attempt < 6 && !base64 && !cancelled; attempt++) {
-          await new Promise((r) => setTimeout(r, attempt === 0 ? 400 : 500));
-          if (cancelled) return;
-          base64 = await snapshot();
-        }
-        if (cancelled) return;
-        if (!base64) throw new Error('toDataURL returned no data after retries');
-        const canShareFile = await Sharing.isAvailableAsync();
-        if (!canShareFile) throw new Error('Sharing.isAvailableAsync() returned false');
-        const uri = `${FileSystem.cacheDirectory}${entry.mark.replace(/\s+/g, '-')}.png`;
-        await FileSystem.writeAsStringAsync(uri, base64, { encoding: 'base64' });
-        await Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png', dialogTitle: 'Share this specimen' });
-      } catch (e) {
-        // No image sharing on this platform (or the capture/write failed)
-        // - fall back to the plain-text summary rather than doing nothing.
-        // Logged, not swallowed silently, so a real failure is diagnosable.
-        console.warn('Image share failed, falling back to text:', e);
-        if (!cancelled) await Share.share({ message: shareTextFor(entry) }).catch(() => {});
-      } finally {
-        if (!cancelled) setSharing(null);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sharing]);
+    try {
+      await shareSpecimen(entry, () => captureRef.current);
+    } finally {
+      setSharing(null);
+    }
+  };
 
   if (!fontsLoaded) return <View style={[styles.root, { backgroundColor: listPalette.screen }]} />;
 
@@ -259,7 +175,7 @@ export default function GalleryScreen() {
           </Text>
         </View>
 
-        {history === null ? null : history.length === 0 ? (
+        {!hydrated ? null : history.length === 0 ? (
           <View style={styles.empty}>
             <ActionIcon kind="gallery" color={listPalette.dim} size={40} />
             <Text style={[styles.emptyText, { color: listPalette.dim, fontFamily: family('body', false) }]}>

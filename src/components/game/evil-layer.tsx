@@ -1,11 +1,9 @@
-import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
-  cancelAnimation,
   useAnimatedStyle,
-  useSharedValue,
+  useDerivedValue,
   withRepeat,
   withSequence,
   withTiming,
@@ -73,24 +71,19 @@ export function FakePermissionDialog({ visible, onClose }: { visible: boolean; o
 
 /** Scanlines plus a chromatic judder over the whole screen. */
 export function GlitchOverlay({ active }: { active: boolean }) {
-  const t = useSharedValue(0);
-
-  useEffect(() => {
-    cancelAnimation(t);
-    if (!active) {
-      t.value = withTiming(0, { duration: 200 });
-      return;
-    }
-    t.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 90, easing: Easing.steps(2, true) }),
-        withTiming(-1, { duration: 90, easing: Easing.steps(2, true) }),
-        withTiming(0.4, { duration: 120, easing: Easing.steps(2, true) })
-      ),
-      -1,
-      false
-    );
-  }, [active, t]);
+  const t = useDerivedValue(() =>
+    active
+      ? withRepeat(
+          withSequence(
+            withTiming(1, { duration: 90, easing: Easing.steps(2, true) }),
+            withTiming(-1, { duration: 90, easing: Easing.steps(2, true) }),
+            withTiming(0.4, { duration: 120, easing: Easing.steps(2, true) })
+          ),
+          -1,
+          false
+        )
+      : withTiming(0, { duration: 200 })
+  );
 
   const style = useAnimatedStyle(() => ({
     opacity: active ? 0.55 + Math.abs(t.value) * 0.35 : 0,

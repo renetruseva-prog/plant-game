@@ -1,5 +1,5 @@
 import { Accelerometer, Gyroscope } from 'expo-sensors';
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 import { useSharedValue } from 'react-native-reanimated';
 
 import { MOTION } from './config';
@@ -43,11 +43,11 @@ const medianOf = (values: number[]): number => {
 export function useMotion(enabled: boolean, events: MotionEvents) {
   const tilt = useSharedValue(0);
 
-  // Keep the latest callbacks without resubscribing the sensor.
-  const handlers = useRef(events);
-  useEffect(() => {
-    handlers.current = events;
-  });
+  // Always call the newest callbacks, without the sensor subscription below
+  // having to restart whenever they change.
+  const emitWalk = useEffectEvent(events.onWalk);
+  const emitNudge = useEffectEvent(events.onNudge);
+  const emitJolt = useEffectEvent(events.onJolt);
 
   const peaks = useRef<number[]>([]);
   const spikes = useRef<number[]>([]);
@@ -159,7 +159,7 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
               spikes.current = [];
               peaks.current = [];
               gentleSince.current = null;
-              handlers.current.onJolt();
+              emitJolt();
             }
             return;
           }
@@ -189,7 +189,7 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
             lastNudge.current = now; // a walk already covers the gentle reaction
             peaks.current = [];
             gentleSince.current = null;
-            handlers.current.onWalk();
+            emitWalk();
             return;
           }
 
@@ -201,7 +201,7 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
           ) {
             lastNudge.current = now;
             gentleSince.current = null;
-            handlers.current.onNudge();
+            emitNudge();
           }
         });
       } catch (e) {

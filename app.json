@@ -50,7 +50,8 @@
         {
           "cameraPermission": "Specimen reads brightness from the camera to tell whether your room is light or dark. No photos are saved or sent anywhere."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

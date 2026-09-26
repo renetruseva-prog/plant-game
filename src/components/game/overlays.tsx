@@ -83,6 +83,7 @@ export function EndingSheet({
   visible,
   scores,
   onRestart,
+  onOpenGallery,
 }: {
   palette: Palette;
   evil: boolean;
@@ -90,6 +91,7 @@ export function EndingSheet({
   visible: boolean;
   scores: Scores;
   onRestart: () => void;
+  onOpenGallery: () => void;
 }) {
   const t = useSharedValue(0);
 
@@ -150,6 +152,12 @@ export function EndingSheet({
           Start a new specimen
         </Text>
       </Pressable>
+
+      <Pressable accessibilityRole="button" onPress={onOpenGallery} style={styles.galleryLink} hitSlop={8}>
+        <Text style={[styles.galleryLinkText, { color: palette.dim, fontFamily: family('semibold', evil) }]}>
+          View past specimens
+        </Text>
+      </Pressable>
     </Animated.View>
   );
 }
@@ -191,4 +199,6 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 22 },
   statLabel: { fontSize: 11.5 },
   sheetBtn: { width: '100%', alignItems: 'center' },
+  galleryLink: { alignSelf: 'center', marginTop: 12, padding: 4 },
+  galleryLinkText: { fontSize: 13 },
 });

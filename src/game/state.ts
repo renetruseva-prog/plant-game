@@ -5,6 +5,20 @@ import type { EndingKind, GameState, InteractionKind, Scores } from './types';
 
 const STORAGE_KEY = 'specimen.state.v1';
 
+const HISTORY_KEY = 'specimen.history.v1';
+/** Past specimens kept for the gallery; oldest entries drop off past this. */
+const HISTORY_LIMIT = 50;
+
+/** One finished run, as kept for the gallery. */
+export type HistoryEntry = {
+  mark: string;
+  ending: EndingKind;
+  latin: string;
+  scores: Scores;
+  /** `Date.now()` when the run finished. */
+  date: number;
+};
+
 const ZERO_SCORES: Scores = { care: 0, light: 0, attention: 0, roughness: 0 };
 
 const ZERO_COUNTS: Record<InteractionKind, number> = {
@@ -151,5 +165,52 @@ export async function clearState() {
     await AsyncStorage.removeItem(STORAGE_KEY);
   } catch {
     // ignore
+  }
+}
+
+export async function loadHistory(): Promise<HistoryEntry[]> {
+  try {
+    const raw = await AsyncStorage.getItem(HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Records a finished run for the gallery, newest first. De-duped by `mark`
+ * so it's safe to call more than once for the same run - e.g. once when the
+ * ending is first reached, and again if the app is reopened on that same
+ * finished state before the player starts a new one.
+ */
+export async function appendHistory(entry: HistoryEntry) {
+  try {
+    const list = await loadHistory();
+    if (list.some((h) => h.mark === entry.mark)) return;
+    const next = [entry, ...list].slice(0, HISTORY_LIMIT);
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // Persistence is a nicety; never let it break a live demo.
+  }
+}
+
+/** Deletes one specimen from the gallery, by its mark. */
+export async function deleteHistory(mark: string) {
+  try {
+    const list = await loadHistory();
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(list.filter((h) => h.mark !== mark)));
+  } catch {
+    // Persistence is a nicety; never let it break a live demo.
+  }
+}
+
+/** Deletes every specimen in the gallery. */
+export async function deleteAllHistory() {
+  try {
+    await AsyncStorage.removeItem(HISTORY_KEY);
+  } catch {
+    // Persistence is a nicety; never let it break a live demo.
   }
 }

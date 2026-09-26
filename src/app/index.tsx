@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
@@ -26,7 +27,7 @@ import { ENDINGS, EVIL_SCRIPT, LEVELS, LINES, WHISPER_START, latinFor } from '@/
 import { family, useGameFonts } from '@/game/fonts';
 import { hapticAlarm, hapticEnding, hapticFor, hapticLevelUp } from '@/game/haptics';
 import { cancelHaunting, hauntWithNotifications } from '@/game/notifications';
-import { clearState, freshState, loadState, reducer, saveState } from '@/game/state';
+import { appendHistory, clearState, freshState, loadState, reducer, saveState } from '@/game/state';
 import { paletteFor } from '@/game/theme';
 import type { EndingKind, InteractionKind, Mood } from '@/game/types';
 import { envFromClock, useAmbientLight } from '@/game/use-ambient-light';
@@ -52,6 +53,7 @@ const newMark = () => `Specimen No. ${String(Math.floor(Math.random() * 9000) + 
 
 export default function GameScreen() {
   const fontsLoaded = useGameFonts();
+  const router = useRouter();
 
   const [state, dispatch] = useReducer(reducer, undefined, freshState);
   const [hydrated, setHydrated] = useState(false);
@@ -130,6 +132,20 @@ export default function GameScreen() {
   useEffect(() => {
     if (hydrated) saveState(state);
   }, [state, hydrated]);
+
+  // Records the run in the gallery the moment it's actually over.
+  // `appendHistory` de-dupes by mark, so this firing again on a reload of an
+  // already-finished run is harmless.
+  useEffect(() => {
+    if (!hydrated || !state.ending) return;
+    appendHistory({
+      mark,
+      ending: state.ending,
+      latin: ENDINGS[state.ending].latin,
+      scores: state.scores,
+      date: Date.now(),
+    });
+  }, [hydrated, state.ending, state.scores, mark]);
 
   /* ---------------- derived ---------------- */
 
@@ -317,6 +333,7 @@ export default function GameScreen() {
   // Android users for a permission the real sensor never needed.
   const cameraEnabled = active && lightSensorStatus === 'unavailable';
 
+  const openGallery = useCallback(() => router.push('/gallery'), [router]);
 
   /** Actually begins gameplay, dismissing the title card and tutorial alike. */
   const beginRun = useCallback(() => {
@@ -477,6 +494,7 @@ export default function GameScreen() {
         visible={sheetUp}
         scores={state.scores}
         onRestart={() => hardReset()}
+        onOpenGallery={openGallery}
       />
 
       <IntroOverlay

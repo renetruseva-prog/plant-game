@@ -58,7 +58,7 @@ export const ENDINGS: Record<
     latin: 'Planta malefica',
     title: 'It took over.',
     goal: 'It remembers how you treated it.',
-    body: 'Rough handling taught it to fight back. None of that was real: nothing on your phone was touched.',
+    body: 'Rough handling taught it to fight back. None of it was real: the photo wasn’t saved, and nothing on your phone was touched.',
   },
   fell: {
     latin: 'Planta lapsa',

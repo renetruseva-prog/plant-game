@@ -12,6 +12,7 @@ import {
   GlitchOverlay,
   type FakeNotif,
 } from '@/components/game/evil-layer';
+import { EvilPhotoBooth } from '@/components/game/evil-photo';
 import { FakeStatusBar } from '@/components/game/fake-status-bar';
 import { EndingSheet, IntroOverlay } from '@/components/game/overlays';
 import { Progress } from '@/components/game/progress';
@@ -81,6 +82,8 @@ export default function GameScreen() {
   // Evil takeover
   const [notifs, setNotifs] = useState<FakeNotif[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
+  /** The bad ending's camera photo, after the player taps Allow. */
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [glitching, setGlitching] = useState(false);
   const [sheetUp, setSheetUp] = useState(false);
 
@@ -179,14 +182,27 @@ export default function GameScreen() {
 
   /* ---------------- the ending ---------------- */
 
-  const closeDialog = useCallback(() => {
-    setDialogOpen(false);
-    if (dialogResolved.current) return;
-    dialogResolved.current = true;
+  /** The end of the bad ending's theatrics: back to normal, then the verdict. */
+  const concludeEnding = useCallback(() => {
+    setPhotoOpen(false);
     setGlitching(false);
     setWhisper('it was only a game.');
     after(900, () => setSheetUp(true));
   }, [after]);
+
+  /** `allowed` is only true when the player actually tapped Allow - that's
+   *  what opens the camera. The safety-net timer closes it with `false`, so
+   *  a player who never engaged with the dialog is never photographed. */
+  const closeDialog = useCallback(
+    (allowed: boolean) => {
+      setDialogOpen(false);
+      if (dialogResolved.current) return;
+      dialogResolved.current = true;
+      if (allowed) setPhotoOpen(true);
+      else concludeEnding();
+    },
+    [concludeEnding]
+  );
 
   /** The scripted reveal. Driven by timers, so it never runs during render. */
   const runFinale = useCallback(
@@ -243,7 +259,7 @@ export default function GameScreen() {
         });
       }
       // Safety net: if nobody taps Allow, the run still resolves itself.
-      after(9500, closeDialog);
+      after(9500, () => closeDialog(false));
     },
     [after, closeDialog]
   );
@@ -352,6 +368,7 @@ export default function GameScreen() {
       cancelHaunting();
       setNotifs([]);
       setDialogOpen(false);
+      setPhotoOpen(false);
       setGlitching(false);
       setSheetUp(false);
       setBurst(null);
@@ -491,7 +508,8 @@ export default function GameScreen() {
         items={notifs}
         onDismiss={(id) => setNotifs((prev) => prev.filter((n) => n.id !== id))}
       />
-      <FakePermissionDialog visible={dialogOpen} onClose={closeDialog} />
+      <FakePermissionDialog visible={dialogOpen} onClose={() => closeDialog(true)} />
+      {photoOpen ? <EvilPhotoBooth onDone={concludeEnding} /> : null}
 
       <EndingSheet
         palette={palette}

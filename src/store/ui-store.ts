@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 
-import type { CameraDebugInfo, CameraLightStatus } from '@/components/game/camera-light-sensor';
 import type { FakeNotif } from '@/components/game/evil-layer';
 import type { Burst, ParticleKind } from '@/components/plant/particles';
 import { WHISPER_START } from '@/game/copy';
@@ -39,10 +38,6 @@ type Transient = {
 };
 
 type UiStore = Transient & {
-  /** Live readouts of the camera sensor, for the hidden dev panel. */
-  cameraStatus: CameraLightStatus;
-  cameraDebug: CameraDebugInfo | null;
-
   setWhisper: (text: string) => void;
   /** Shows a mood, then lets the plant settle back to idle. */
   flashMood: (mood: Mood) => void;
@@ -58,8 +53,6 @@ type UiStore = Transient & {
   setDialogOpen: (open: boolean) => void;
   setPhotoOpen: (open: boolean) => void;
   setGlitching: (on: boolean) => void;
-  setCameraStatus: (status: CameraLightStatus) => void;
-  setCameraDebug: (info: CameraDebugInfo) => void;
   /** Back to a clean slate for a new specimen. */
   resetTransient: () => void;
   /** Returning to an already-finished run: straight to the verdict, no
@@ -92,8 +85,6 @@ const initialTransient = (): Transient => ({
  */
 export const useUiStore = create<UiStore>()((set) => ({
   ...initialTransient(),
-  cameraStatus: 'pending',
-  cameraDebug: null,
 
   setWhisper: (whisper) => set({ whisper }),
   flashMood: (mood) => {
@@ -117,8 +108,6 @@ export const useUiStore = create<UiStore>()((set) => ({
   setDialogOpen: (dialogOpen) => set({ dialogOpen }),
   setPhotoOpen: (photoOpen) => set({ photoOpen }),
   setGlitching: (glitching) => set({ glitching }),
-  setCameraStatus: (cameraStatus) => set({ cameraStatus }),
-  setCameraDebug: (cameraDebug) => set({ cameraDebug }),
 
   resetTransient: () => {
     if (moodTimer) clearTimeout(moodTimer);

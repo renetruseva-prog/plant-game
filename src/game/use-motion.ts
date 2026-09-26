@@ -85,13 +85,6 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
       const available = await Accelerometer.isAvailableAsync().catch(() => false);
       if (!available || cancelled) return;
 
-      // Guard against environments where the native module doesn't expose
-      // `addListener`, preventing "this._nativeModule.addListener is not a
-      // function" errors when running on web or with mismatched native modules.
-      if (typeof Accelerometer.setUpdateInterval !== 'function') {
-        return;
-      }
-
       Accelerometer.setUpdateInterval(MOTION.intervalMs);
 
       // The gyroscope is optional corroboration, not a requirement - plenty
@@ -99,11 +92,7 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
       // accelerometer alone when it's missing.
       const gyroAvailableNow = await Gyroscope.isAvailableAsync().catch(() => false);
       gyroAvailable.current = gyroAvailableNow;
-      if (
-        gyroAvailableNow &&
-        typeof Gyroscope.setUpdateInterval === 'function' &&
-        typeof Gyroscope.addListener === 'function'
-      ) {
+      if (gyroAvailableNow) {
         try {
           Gyroscope.setUpdateInterval(MOTION.intervalMs);
           gyroSub = Gyroscope.addListener(({ x, y, z }) => {
@@ -121,7 +110,6 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
       }
 
       try {
-        if (typeof Accelerometer.addListener !== 'function') return;
         accelSub = Accelerometer.addListener(({ x, y, z }) => {
           const now = Date.now();
           const magnitude = Math.sqrt(x * x + y * y + z * z);
@@ -205,13 +193,12 @@ export function useMotion(enabled: boolean, events: MotionEvents) {
           }
         });
       } catch (e) {
-        // If the native implementation is missing or throws, avoid crashing
-        // the JS runtime — log and bail out; the app should continue with
-        // graceful fallback behavior.
+        // No usable accelerometer here (e.g. web): play on without motion.
         console.warn('Accelerometer.addListener failed:', e);
-        return;
       }
-    })();
+    })().catch(() => {
+      // Sensors missing or unusable here (e.g. web): play on without motion.
+    });
 
     return () => {
       cancelled = true;

@@ -15,8 +15,8 @@ export type LightSensorStatus = 'checking' | 'available' | 'unavailable';
 /**
  * Real ambient light on Android via `LightSensor`. On iOS - or any device
  * without one - `status` resolves to `'unavailable'` so the caller can fall
- * back to something else (see `CameraLightSensor`, then the manual curtains
- * toggle as the last resort).
+ * back to the camera (see `CameraLightSensor`), and failing that, the time
+ * of day.
  */
 export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => void) {
   const [status, setStatus] = useState<LightSensorStatus>('checking');
@@ -41,14 +41,6 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
       if (cancelled) return;
       setStatus(available ? 'available' : 'unavailable');
       if (!available) return;
-
-      // Some environments (web, mismatched native modules) may not implement
-      // `addListener`. Guard against that to avoid "this._nativeModule.addListener
-      // is not a function" runtime errors.
-      if (typeof LightSensor.setUpdateInterval !== 'function' || typeof LightSensor.addListener !== 'function') {
-        setStatus('unavailable');
-        return;
-      }
 
       LightSensor.setUpdateInterval(LIGHT.intervalMs);
       sub = LightSensor.addListener(({ illuminance }) => {

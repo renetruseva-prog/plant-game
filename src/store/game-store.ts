@@ -14,7 +14,7 @@ import {
   nextSpecimen,
   runEndingAs,
 } from '@/game/rules';
-import type { EndingKind, Env, GameState, InteractionKind } from '@/game/types';
+import type { EndingKind, GameState, InteractionKind } from '@/game/types';
 
 import { useHistoryStore } from './history-store';
 import { createStorage } from './storage';
@@ -23,7 +23,6 @@ import { useUiStore } from './ui-store';
 type GameActions = {
   /** Dismisses the title card and tutorial: the run begins. */
   start: () => void;
-  setEnv: (env: Env) => void;
   /** One scored interaction. Records the run in the gallery if it was the
    *  one that ended it. */
   interact: (kind: InteractionKind) => void;
@@ -83,11 +82,6 @@ export const useGameStore = create<GameStore>()(
       hydrated: false,
 
       start: () => set({ started: true }),
-
-      setEnv: (env) => {
-        if (get().ending) return;
-        set({ env });
-      },
 
       interact: (kind) => {
         const prev = get();

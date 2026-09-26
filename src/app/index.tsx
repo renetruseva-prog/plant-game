@@ -28,7 +28,7 @@ export default function GameScreen() {
   const hydrated = useGameStore((s) => s.hydrated);
 
   const view = useSpecimenView();
-  const { tilt, fallAngle, camera, lightSensorStatus } = useDeviceInput();
+  const { tilt, fallAngle, camera } = useDeviceInput();
 
   const whisper = useUiStore((s) => s.whisper);
   const sheetUp = useUiStore((s) => s.sheetUp);
@@ -90,7 +90,6 @@ export default function GameScreen() {
       <GameOverlays
         palette={palette}
         evil={evil}
-        lightSensorStatus={lightSensorStatus}
         onOpenGallery={openGallery}
       />
     </View>

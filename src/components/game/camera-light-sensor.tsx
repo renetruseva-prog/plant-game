@@ -6,15 +6,6 @@ import { CAMERA_LIGHT } from '@/game/config';
 import { frameStatsFromBase64Jpeg, medianOf, type FrameStats } from '@/game/camera-luma';
 import type { Env } from '@/game/types';
 
-export type CameraLightStatus = 'pending' | 'active' | 'unavailable';
-
-/** Raw internals of the covered-lens decision, for the hidden dev panel -
- *  the only way to actually see this pipeline's numbers on a real device,
- *  since there's no way to attach a debugger to it mid-gesture. */
-export type CameraDebugInfo =
-  | ({ kind: 'reading'; baseline: number | null; covered: boolean; streak: number } & FrameStats)
-  | { kind: 'error'; message: string };
-
 /** Whether this frame looks like a finger over the lens - see the comment on
  *  `coveredMaxStdDev` in `config.ts` for why brightness alone isn't enough. */
 function looksCovered({ luma, lumaStdDev, redRatio }: FrameStats, baseline: number | null): boolean {
@@ -32,7 +23,6 @@ type Props = {
   /** Only samples while true - stops the moment the run isn't playing. */
   enabled: boolean;
   onEnvChange: (env: Env) => void;
-  onStatus: (status: CameraLightStatus) => void;
   /** Fired once per covering, once the frame has looked like a finger over
    *  the lens (see `looksCovered`) for `coveredHoldTicks` samples in a row -
    *  not merely because the room happens to be dark. */
@@ -49,7 +39,6 @@ type Props = {
    * the camera doesn't reliably cover that sensor, which sits elsewhere.
    */
   mode?: 'ambient' | 'cover-only';
-  onDebug?: (info: CameraDebugInfo) => void;
 };
 
 /**
@@ -59,8 +48,8 @@ type Props = {
  * apps in any framework, so there is no direct equivalent of Android's
  * `LightSensor` to call here. This samples the camera feed instead - a real
  * phone sensor genuinely reacting to the room's light, just read indirectly.
- * If the camera is denied or unavailable, `onStatus('unavailable')` tells the
- * caller to fall back further, to the manual curtains toggle.
+ * If the camera is denied or unavailable, the room simply keeps the light
+ * it was seeded with from the time of day.
  *
  * Because it's reading the lens rather than a dedicated sensor, it can also
  * tell a covered lens apart from a merely dark room - see `onSleep`. On phones
@@ -81,11 +70,9 @@ type Props = {
 export function CameraLightSensor({
   enabled,
   onEnvChange,
-  onStatus,
   onSleep,
   onUncovered,
   mode = 'ambient',
-  onDebug,
 }: Props) {
   const [permission, requestPermission] = useCameraPermissions();
   const [ready, setReady] = useState(false);
@@ -116,36 +103,21 @@ export function CameraLightSensor({
   // Always call the newest callbacks and read the newest mode, without the
   // permission and sampling effects below restarting whenever they change.
   const emitEnv = useEffectEvent(onEnvChange);
-  const emitStatus = useEffectEvent(onStatus);
   const emitSleep = useEffectEvent(onSleep);
   const emitUncovered = useEffectEvent(() => onUncovered?.());
-  const emitDebug = useEffectEvent((info: CameraDebugInfo) => onDebug?.(info));
   const currentMode = useEffectEvent(() => mode);
 
   // Ask for permission once, lazily, only once the run actually needs it -
   // never at cold start, before the player has even tapped Start.
   useEffect(() => {
     if (!enabled || requestedRef.current || !permission) return;
-    if (permission.granted) return;
-    if (!permission.canAskAgain) {
-      emitStatus('unavailable');
-      return;
-    }
+    if (permission.granted || !permission.canAskAgain) return;
     requestedRef.current = true;
-    requestPermission().then((next) => {
-      if (!next.granted) emitStatus('unavailable');
-    });
+    requestPermission();
   }, [enabled, permission, requestPermission]);
 
   useEffect(() => {
-    if (!enabled || !permission?.granted || !ready) {
-      if (enabled && permission && !permission.granted && permission.canAskAgain === false) {
-        emitStatus('unavailable');
-      }
-      return;
-    }
-
-    emitStatus('active');
+    if (!enabled || !permission?.granted || !ready) return;
 
     if (!sizedRef.current && cameraRef.current) {
       sizedRef.current = true;
@@ -188,16 +160,10 @@ export function CameraLightSensor({
         if (cancelled) return;
         const saved = await ref.savePictureAsync({ base64: true, quality: CAMERA_LIGHT.jpegQuality });
         if (cancelled) return;
-        if (!saved.base64) {
-          emitDebug({ kind: 'error', message: 'savePictureAsync returned no base64' });
-          return;
-        }
+        if (!saved.base64) return;
 
         const stats = frameStatsFromBase64Jpeg(saved.base64);
-        if (stats === null) {
-          emitDebug({ kind: 'error', message: 'JPEG decode failed' });
-          return;
-        }
+        if (stats === null) return;
         const { luma } = stats;
 
         // Checked before the baseline below is updated, so a covered reading
@@ -246,13 +212,6 @@ export function CameraLightSensor({
           sleepFired.current = false;
         }
 
-        emitDebug({
-          kind: 'reading',
-          ...stats,
-          baseline: baselineLuma.current,
-          covered: isCovered,
-          streak: coveredStreak.current,
-        });
 
         // While the lens is covered, the ordinary day/night check stays out
         // of it. A covered frame is often still bright (auto-exposure), so
@@ -276,9 +235,8 @@ export function CameraLightSensor({
           lastEnv.current = next;
           emitEnv(next);
         }
-      } catch (e) {
+      } catch {
         // One missed frame doesn't matter; the next tick tries again.
-        emitDebug({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
       } finally {
         if (!cancelled) timer = setTimeout(tick, CAMERA_LIGHT.intervalMs);
       }

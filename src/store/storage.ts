@@ -10,10 +10,17 @@ import { createJSONStorage } from 'zustand/middleware';
  * the envelope persist expects, so a player's saved run and gallery survive
  * the change. Once the store writes under its own key that one wins, and the
  * legacy key is never read again.
+ *
+ * Expo renders the web build once in Node ("static" output), where there is
+ * no `window` and AsyncStorage's web backend throws on any read or write. In
+ * that pass the storage is a no-op; the real one takes over on the client.
  */
+const isServerRender = typeof window === 'undefined';
+
 export function createStorage(legacyKey: string, wrapLegacy: (legacy: unknown) => unknown, version: number) {
   return createJSONStorage(() => ({
     getItem: async (name) => {
+      if (isServerRender) return null;
       const own = await AsyncStorage.getItem(name);
       if (own !== null) return own;
       const legacy = await AsyncStorage.getItem(legacyKey);
@@ -24,7 +31,11 @@ export function createStorage(legacyKey: string, wrapLegacy: (legacy: unknown) =
         return null;
       }
     },
-    setItem: (name, value) => AsyncStorage.setItem(name, value),
-    removeItem: (name) => AsyncStorage.removeItem(name),
+    setItem: async (name, value) => {
+      if (!isServerRender) await AsyncStorage.setItem(name, value);
+    },
+    removeItem: async (name) => {
+      if (!isServerRender) await AsyncStorage.removeItem(name);
+    },
   }));
 }

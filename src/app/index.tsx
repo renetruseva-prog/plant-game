@@ -18,6 +18,7 @@ import { Progress } from '@/components/game/progress';
 import { SpecimenTag } from '@/components/game/specimen-tag';
 import { Stage } from '@/components/game/stage';
 import { TutorialOverlay } from '@/components/game/tutorial-overlay';
+import { FingerAura } from '@/components/plant/finger-aura';
 import { Particles, PulseRing, type Burst, type ParticleKind } from '@/components/plant/particles';
 import { Plant, SleepZs } from '@/components/plant/plant';
 import { TouchLayer } from '@/components/plant/touch-layer';
@@ -31,6 +32,7 @@ import { paletteFor } from '@/game/theme';
 import type { EndingKind, InteractionKind, Mood } from '@/game/types';
 import { envFromClock, useAmbientLight } from '@/game/use-ambient-light';
 import { useEyeTracking } from '@/game/use-eye-tracking';
+import { useFingerAura } from '@/game/use-finger-aura';
 import { useMotion } from '@/game/use-motion';
 import { useOutside } from '@/game/use-outside';
 import { useTypewriter } from '@/game/use-typewriter';
@@ -65,6 +67,9 @@ export default function GameScreen() {
   const [devOpen, setDevOpen] = useState(false);
   /** Live pupil offset while a finger drags on the stage but off the plant. */
   const { eyeX, eyeY, trackEyes, releaseEyes } = useEyeTracking();
+  /** The glow that follows the finger anywhere on the stage. */
+  const { auraX, auraY, auraOpacity, auraKind, showAura, moveAura, startAuraHold, hideAura } =
+    useFingerAura();
   const [mark, setMark] = useState(newMark);
   /** Shown between the title card and actually starting - see `beginRun`. */
   const [showTutorial, setShowTutorial] = useState(false);
@@ -459,9 +464,16 @@ export default function GameScreen() {
             onStroke={() => interact('stroke')}
             onShake={() => interact('shake')}
             onPinch={onPlantPinch}
+            onWater={() => interact('water')}
+            onSun={() => interact('sun')}
             onTrackEyes={trackEyes}
             onReleaseEyes={releaseEyes}
+            onAuraShow={showAura}
+            onAuraMove={moveAura}
+            onAuraHold={startAuraHold}
+            onAuraHide={hideAura}
           />
+          <FingerAura auraX={auraX} auraY={auraY} auraOpacity={auraOpacity} auraKind={auraKind} />
         </Stage>
 
         <Animated.Text

@@ -193,6 +193,35 @@ export const TOUCH = {
   rapidTapWindowMs: 700,
   /** Holding a finger still on the plant this long counts as a stroke, live. */
   holdDurationMs: 1200,
+  /**
+   * Movement past this (much smaller than `minDragForVelocity`) cancels the
+   * hold-to-stroke timer. A slow, deliberate drag - pouring water is often
+   * unhurried - can easily still be under `minDragForVelocity` a full
+   * `holdDurationMs` in, and reusing that bigger threshold here would let
+   * the hold fire and lock in a stroke before the drag ever gets a chance
+   * to become water or sun.
+   */
+  holdCancelDistance: 8,
+  /**
+   * A drag on the plant longer than this, and dominated by one axis (see
+   * `directionalAngleRatio`), reads as a deliberate gesture - down to water,
+   * up toward the light - rather than an ordinary pet. Bigger than
+   * `minDragForVelocity` so a short, mostly-vertical stroke still pets
+   * instead of accidentally watering.
+   */
+  directionalDragMinDistance: 30,
+  /** How much one axis must dominate the other for a drag to count as
+   *  "vertical" rather than an ambiguous diagonal (which still just pets). */
+  directionalAngleRatio: 1.3,
+  /**
+   * How far a vertical drag has to go before the finger aura previews it
+   * (blue for rain, gold for light). Much shorter than
+   * `directionalDragMinDistance`: the aura is feedback, not a commitment, so
+   * it should react as soon as it's plausible rather than after the gesture
+   * has already been decided - waiting for the full 30px left the first part
+   * of every slide looking like nothing was happening.
+   */
+  directionalPreviewDistance: 10,
   /** How far the pupils drift while tracking a finger elsewhere on the stage. */
   eyeMaxOffset: 3.6,
   eyeFollowDuration: 90,

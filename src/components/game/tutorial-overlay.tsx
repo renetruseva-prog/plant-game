@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
   useAnimatedStyle,
   useDerivedValue,
+  useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
@@ -44,7 +45,13 @@ function Caption({ palette, children }: { palette: Palette; children: string }) 
  * says nothing about *how* to trigger it. The motion is the instruction.
  */
 function DragDemo({ direction, icon, palette }: { direction: 'down' | 'up'; icon: IconKind; palette: Palette }) {
-  const t = useDerivedValue(() => withRepeat(withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.quad) }), -1, false));
+  const t = useSharedValue(0);
+
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.quad) }), -1, false);
+  }, [t]);
 
   const dotStyle = useAnimatedStyle(() => {
     const y =
@@ -79,7 +86,13 @@ function DragDemo({ direction, icon, palette }: { direction: 'down' | 'up'; icon
  * long is long enough.
  */
 function HoldDemo({ palette }: { palette: Palette }) {
-  const t = useDerivedValue(() => withRepeat(withTiming(1, { duration: 1200, easing: Easing.out(Easing.quad) }), -1, false));
+  const t = useSharedValue(0);
+
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.out(Easing.quad) }), -1, false);
+  }, [t]);
 
   const ringStyle = useAnimatedStyle(() => ({
     transform: [{ scale: 0.35 + t.value }],
@@ -99,7 +112,13 @@ function HoldDemo({ palette }: { palette: Palette }) {
 
 /** A fingertip wiggling rapidly in place - shaking it by hand. */
 function FingerShakeDemo({ palette }: { palette: Palette }) {
-  const t = useDerivedValue(() => withRepeat(withTiming(1, { duration: 130, easing: Easing.linear }), -1, true));
+  const t = useSharedValue(0);
+
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 130, easing: Easing.linear }), -1, true);
+  }, [t]);
 
   const dotStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: interpolate(t.value, [0, 1], [-12, 12]) }],
@@ -118,7 +137,13 @@ function FingerShakeDemo({ palette }: { palette: Palette }) {
 
 /** A little phone glyph rattling side to side - shaking the device itself. */
 function PhoneShakeDemo({ palette }: { palette: Palette }) {
-  const t = useDerivedValue(() => withRepeat(withTiming(1, { duration: 90, easing: Easing.linear }), -1, true));
+  const t = useSharedValue(0);
+
+  // Starting an endless loop on mount is a side effect, not a derived value:
+  // nothing here changes, so a derived value would never (re)start it.
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 90, easing: Easing.linear }), -1, true);
+  }, [t]);
 
   const style = useAnimatedStyle(() => ({
     transform: [{ rotate: `${interpolate(t.value, [0, 1], [-9, 9])}deg` }],

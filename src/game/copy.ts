@@ -29,11 +29,6 @@ export const LINES: Record<InteractionKind, string[]> = {
   ],
   nudge: ['It felt that. Gently.', 'A soft tilt. It settles again.', 'It rocks, and likes it.'],
   jolt: ['You shook it. Hard.', 'That hurt.', 'It braces itself against you.'],
-  outside: [
-    'Outside. Real light, real air.',
-    'It opens up in the open air.',
-    'It has never felt this much sky.',
-  ],
   daylight: ['Light again. It wakes up.', 'The room brightens. It lifts.'],
   nightfall: ['The light drops. It falls asleep.', 'Dark now. It folds inward.'],
 };
@@ -95,12 +90,6 @@ export function latinFor(level: number, form: EndingKind | null, ending: EndingK
   if (level === 3) return 'Planta cognoscenda';
   return 'Planta incognita';
 }
-
-/** Action labels. The evil plant relabels the whole interface. */
-export const ACTION_LABELS: Record<'normal' | 'evil', Record<string, string>> = {
-  normal: { water: 'Water', sun: 'Sunlight', stroke: 'Stroke', shake: 'Shake' },
-  evil: { water: 'give', sun: 'look', stroke: 'obey', shake: 'don’t' },
-};
 
 /** The scripted takeover. Each step is offset in ms from the reveal. */
 export type EvilStep =

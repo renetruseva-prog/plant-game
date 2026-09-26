@@ -17,7 +17,6 @@ export type InteractionKind =
   | 'walk'
   | 'nudge'
   | 'jolt'
-  | 'outside'
   | 'daylight'
   | 'nightfall';
 
@@ -41,8 +40,6 @@ export type GameState = {
   level: number;
   ending: EndingKind | null;
   env: Env;
-  /** Set once the player has confirmed being outside. */
-  wentOutside: boolean;
   /** Dismissed the intro card. */
   started: boolean;
 };

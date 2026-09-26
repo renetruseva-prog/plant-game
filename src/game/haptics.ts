@@ -29,7 +29,6 @@ export function hapticFor(kind: InteractionKind) {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       });
     case 'walk':
-    case 'outside':
       return run(() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium));
     default:
       return run(() => Haptics.selectionAsync());

@@ -1,6 +1,6 @@
 import Svg, { Circle, Path } from 'react-native-svg';
 
-export type IconKind = 'water' | 'sun' | 'stroke' | 'shake' | 'walk' | 'moon' | 'outside';
+export type IconKind = 'water' | 'sun' | 'stroke' | 'shake' | 'walk' | 'moon';
 
 /**
  * The whole line-icon set, shared between the action buttons and the
@@ -47,13 +47,6 @@ export function ActionIcon({ kind, color, size = 28 }: { kind: IconKind; color: 
       return (
         <Svg width={size} height={size} viewBox="0 0 24 24">
           <Path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z" {...p} />
-        </Svg>
-      );
-    case 'outside':
-      return (
-        <Svg width={size} height={size} viewBox="0 0 24 24">
-          <Path d="M12 21s-7-4.6-7-11a7 7 0 0 1 14 0c0 6.4-7 11-7 11z" {...p} />
-          <Circle cx={12} cy={10} r={2.4} {...p} />
         </Svg>
       );
   }

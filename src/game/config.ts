@@ -32,7 +32,6 @@ export const WEIGHTS: Record<InteractionKind, Partial<Scores>> = {
   walk: { attention: 3, light: 1 }, // rhythmic accelerometer pattern
   nudge: { attention: 3 }, // gentle physical movement
   jolt: { roughness: 5 }, // aggressive physical shake
-  outside: { light: 5, care: 2 }, // location moved far enough / check-in
   daylight: { light: 3 }, // curtains opened or ambient light rose
   nightfall: { care: 1 }, // curtains closed: resting is mild care, not neglect
 };
@@ -58,7 +57,7 @@ export const ENDING_RULES = {
    * flat cap - `attention` relative to `care + light` - so it scales with
    * however many interactions actually happened, and still catches "a
    * little" affection sneaking in without catching a genuinely balanced run
-   * that happens to lean on walk/outside more than deliberate stroking.
+   * that happens to lean on walking more than deliberate stroking.
    * `minCareLight` sits well above what care alone could reach from
    * sun-only incidental care (every sun tap carries +1), so sunlight
    * without any real watering doesn't get mistaken for both.
@@ -162,13 +161,6 @@ export const CAMERA_LIGHT = {
    * crossing the lens) can't flip the room by itself.
    */
   smoothingWindow: 3,
-} as const;
-
-/** Location tuning for the "take me outside" interaction. */
-export const OUTSIDE = {
-  /** Metres from the first-open anchor that count as "went outside". */
-  distanceM: 40,
-  timeoutMs: 8000,
 } as const;
 
 /** Touching the plant directly, on top of the button row and phone shaking. */

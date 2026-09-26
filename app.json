@@ -39,12 +39,6 @@
         }
       ],
       [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "Specimen uses your location only to tell whether you carried it outside."
-        }
-      ],
-      [
         "expo-sensors",
         {
           "motionPermission": "Specimen reacts when you walk with it or shake it."

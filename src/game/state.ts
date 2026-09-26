@@ -4,8 +4,6 @@ import { FINAL_COUNT, THRESHOLDS, applyWeights, endingOf, levelFor } from './con
 import type { EndingKind, GameState, InteractionKind, Scores } from './types';
 
 const STORAGE_KEY = 'specimen.state.v1';
-/** Anchor location for the "outside" check, kept across runs of the same device. */
-export const ANCHOR_KEY = 'specimen.anchor.v1';
 
 const ZERO_SCORES: Scores = { care: 0, light: 0, attention: 0, roughness: 0 };
 
@@ -17,7 +15,6 @@ const ZERO_COUNTS: Record<InteractionKind, number> = {
   walk: 0,
   nudge: 0,
   jolt: 0,
-  outside: 0,
   daylight: 0,
   nightfall: 0,
 };
@@ -30,7 +27,6 @@ export function freshState(): GameState {
     level: 1,
     ending: null,
     env: 'day',
-    wentOutside: false,
     started: false,
   };
 }
@@ -76,7 +72,6 @@ export function reducer(state: GameState, action: Action): GameState {
         counts: { ...state.counts, [kind]: state.counts[kind] + 1 },
         scores,
         level: levelFor(count),
-        wentOutside: state.wentOutside || kind === 'outside',
         // A light interaction also moves the room into that state.
         env: kind === 'nightfall' ? 'dark' : kind === 'daylight' || kind === 'sun' ? 'day' : state.env,
       };

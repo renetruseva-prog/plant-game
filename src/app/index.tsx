@@ -3,7 +3,6 @@ import { Alert, StyleSheet, View } from 'react-native';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Actions, type TapKind } from '@/components/game/actions';
 import { CameraLightSensor, type CameraLightStatus } from '@/components/game/camera-light-sensor';
 import { DevPanel } from '@/components/game/dev-panel';
 import {
@@ -34,7 +33,6 @@ import { envFromClock, useAmbientLight } from '@/game/use-ambient-light';
 import { useEyeTracking } from '@/game/use-eye-tracking';
 import { useFingerAura } from '@/game/use-finger-aura';
 import { useMotion } from '@/game/use-motion';
-import { useOutside } from '@/game/use-outside';
 import { useTypewriter } from '@/game/use-typewriter';
 import { useUpsideDown } from '@/game/use-upside-down';
 
@@ -45,7 +43,6 @@ const PARTICLE_FOR: Partial<Record<InteractionKind, ParticleKind>> = {
   stroke: 'heart',
   nudge: 'heart',
   walk: 'heart',
-  outside: 'sun',
   shake: 'thorn',
   jolt: 'thorn',
 };
@@ -323,31 +320,6 @@ export default function GameScreen() {
     lightSensorStatus === 'available' ? 'sensor' : cameraStatus === 'active' ? 'camera' : 'manual';
   const lightReading = lightSource === 'sensor' ? lux : lightSource === 'camera' ? cameraLuma : null;
 
-  const { check: checkOutside, busy: outsideBusy } = useOutside();
-
-  const onOutside = useCallback(async () => {
-    const result = await checkOutside();
-    // The whisper is set first, then the interaction overwrites it only when
-    // it has something better to say than the location read-out.
-    switch (result.kind) {
-      case 'moved':
-        interact('outside');
-        setWhisper(`${Math.round(result.metres)} m from home. It has never felt this much sky.`);
-        break;
-      case 'anchored':
-        interact('daylight');
-        setWhisper('Noted where you started. Carry it outside and tap again.');
-        break;
-      case 'too-close':
-        interact('daylight');
-        setWhisper('Still the same room. It can tell.');
-        break;
-      case 'checkin':
-        interact('outside');
-        setWhisper('No location. Taking your word for it: outside.');
-        break;
-    }
-  }, [checkOutside, interact]);
 
   const toggleEnv = useCallback(() => {
     if (!active) return;
@@ -485,16 +457,6 @@ export default function GameScreen() {
         </Animated.Text>
 
         <Progress palette={palette} evil={evil} level={state.level} count={state.count} />
-
-        <Actions
-          palette={palette}
-          evil={evil}
-          disabled={finished}
-          onTap={(kind: TapKind) => interact(kind)}
-          onOutside={onOutside}
-          outsideBusy={outsideBusy}
-          outsideDone={state.wentOutside}
-        />
       </SafeAreaView>
 
       <CameraLightSensor

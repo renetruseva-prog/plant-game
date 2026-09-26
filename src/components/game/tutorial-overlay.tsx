@@ -22,8 +22,8 @@ const PAGES: Page[] = [
   },
   {
     title: 'It feels the real world',
-    body: 'Walk around with it and it sways along. The room’s real light wakes it up or puts it to sleep. Take it outside when you actually go.',
-    icons: ['walk', 'moon', 'outside'],
+    body: 'Walk around with it and it sways along. The room’s real light wakes it up or puts it to sleep.',
+    icons: ['walk', 'moon'],
   },
   {
     title: 'Five stages, three fates',

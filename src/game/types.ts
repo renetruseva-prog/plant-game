@@ -1,3 +1,7 @@
+
+//shared type definitions: what an "interaction" can be
+// what an "ending" can be and the shape of `GameState`
+
 /**
  * `'carnivore'` (all water and light, barely any affection) and `'cactus'`
  * (light and affection, barely any water) are scored endings alongside

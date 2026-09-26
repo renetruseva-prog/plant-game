@@ -62,7 +62,10 @@ export function useAmbientLight(enabled: boolean, onEnvChange: (env: Env) => voi
           emitEnv(next);
         }
       });
-    })();
+    })().catch(() => {
+      // Sensor exists but can't be subscribed to (e.g. web): fall back to the camera.
+      if (!cancelled) setStatus('unavailable');
+    });
 
     return () => {
       cancelled = true;

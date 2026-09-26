@@ -97,7 +97,9 @@ export function useUpsideDown(enabled: boolean, onFall: () => void): { fallAngle
           flippedSince = null;
         }
       });
-    })();
+    })().catch(() => {
+      // Sensor missing or unusable here (e.g. web): the fall just never fires.
+    });
 
     return () => {
       cancelled = true;

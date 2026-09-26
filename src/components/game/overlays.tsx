@@ -8,7 +8,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
-import { ENDINGS } from '@/game/copy';
+import { ENDINGS, LEGACY_INTRO } from '@/game/copy';
 import { family } from '@/game/fonts';
 import type { Palette } from '@/game/theme';
 import type { EndingKind, Scores } from '@/game/types';
@@ -29,10 +29,13 @@ export function IntroOverlay({
   palette,
   visible,
   onStart,
+  legacy,
 }: {
   palette: Palette;
   visible: boolean;
   onStart: () => void;
+  /** The previous specimen's ending, if this device has raised one before. */
+  legacy: EndingKind | null;
 }) {
   const t = useSharedValue(visible ? 1 : 0);
 
@@ -55,7 +58,9 @@ export function IntroOverlay({
         Planta incognita
       </Text>
       <Text style={[styles.introBody, { color: palette.ink, fontFamily: family('body', false) }]}>
-        A specimen arrived. Nobody knows what it will grow into. Look after it and find out.
+        {legacy
+          ? LEGACY_INTRO[legacy]
+          : 'A specimen arrived. Nobody knows what it will grow into. Look after it and find out.'}
       </Text>
       <Pressable
         accessibilityRole="button"

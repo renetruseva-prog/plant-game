@@ -43,6 +43,8 @@ export function freshState(): GameState {
     ending: null,
     env: 'day',
     started: false,
+    generation: 1,
+    legacy: null,
   };
 }
 
@@ -74,7 +76,16 @@ export function reducer(state: GameState, action: Action): GameState {
       // again on every new specimen, the same as a first launch (skippable
       // either way). Only `devJump`/`devForce` skip straight past them, for
       // quick testing from the hidden dev panel.
-      return freshState();
+      //
+      // `generation`/`legacy` are purely cosmetic continuity, not a scoring
+      // effect - see `GameState`. A previous run abandoned mid-way (no
+      // `ending` yet) leaves the existing lineage untouched rather than
+      // erasing it.
+      return {
+        ...freshState(),
+        generation: state.generation + 1,
+        legacy: state.ending ?? state.legacy,
+      };
 
     case 'setEnv':
       if (state.ending) return state;

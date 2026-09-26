@@ -47,4 +47,12 @@ export type GameState = {
   env: Env;
   /** Dismissed the intro card. */
   started: boolean;
+  /** How many specimens this device has raised, counting this one. Purely
+   *  cosmetic - see `legacy` - it never affects scoring. */
+  generation: number;
+  /** The previous specimen's ending, carried into this one for flavour only:
+   *  the intro copy and the level-1 palette acknowledge it, but none of the
+   *  scoring in `config.ts` reads it. `null` for the very first specimen, or
+   *  whenever the previous run was abandoned before reaching a verdict. */
+  legacy: EndingKind | null;
 };

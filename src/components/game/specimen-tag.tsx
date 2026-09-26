@@ -13,6 +13,9 @@ type Props = {
   latin: string;
   stageName: string;
   goal: string;
+  /** How many specimens this device has raised, counting this one. Shown
+   *  from the second onward - "Gen 1" would just be clutter on a first run. */
+  generation: number;
   onSecretHold: () => void;
 };
 
@@ -28,6 +31,7 @@ export function SpecimenTag({
   latin,
   stageName,
   goal,
+  generation,
   onSecretHold,
 }: Props) {
   return (
@@ -50,7 +54,7 @@ export function SpecimenTag({
           </Text>
         </Pressable>
         <Text style={[styles.meta, { color: palette.dim, fontFamily: family('medium', evil) }]}>
-          Level {level} of 5
+          Level {level} of 5{generation > 1 ? ` · Gen ${generation}` : ''}
         </Text>
       </View>
 

@@ -146,3 +146,17 @@ export const EVIL_SCRIPT: EvilStep[] = [
 ];
 
 export const WHISPER_START = 'It hasn’t moved yet. Try something.';
+
+/**
+ * The intro card's body text for a specimen with a predecessor - shown
+ * instead of the default first-timer copy from the second specimen onward.
+ * Flavour only: nothing here affects scoring, see `legacy` on `GameState`.
+ */
+export const LEGACY_INTRO: Record<EndingKind, string> = {
+  good: 'The last one bloomed, given nothing but steady, gentle care. Let’s see about this one.',
+  neutral: 'The last one just got by - some care, some gaps. This one starts the same way: a blank page.',
+  bad: 'The last one turned on you. This one is already watching.',
+  fell: 'The last one slipped out of its pot and couldn’t hold on. Try to hang onto this one.',
+  carnivore: 'The last one stopped waiting for affection and started catching its own. This one hasn’t decided yet.',
+  cactus: 'The last one toughened up until it barely needed watering at all. This one might not.',
+};

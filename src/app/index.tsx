@@ -157,8 +157,8 @@ export default function GameScreen() {
   );
   const form: EndingKind | null = state.ending ?? (state.level >= 4 ? tendency : null);
   const palette = useMemo(
-    () => paletteFor(state.level, state.env, tendency, state.ending),
-    [state.level, state.env, tendency, state.ending]
+    () => paletteFor(state.level, state.env, tendency, state.ending, state.legacy),
+    [state.level, state.env, tendency, state.ending, state.legacy]
   );
 
   const totalScore =
@@ -411,6 +411,7 @@ export default function GameScreen() {
           latin={latin}
           stageName={stageName}
           goal={goal}
+          generation={state.generation}
           onSecretHold={() => setDevOpen((v) => !v)}
         />
 
@@ -505,6 +506,7 @@ export default function GameScreen() {
       <IntroOverlay
         palette={palette}
         visible={!state.started && !showTutorial}
+        legacy={state.legacy}
         onStart={() => setShowTutorial(true)}
       />
 

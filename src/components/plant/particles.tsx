@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withDelay,
   withTiming,
@@ -66,8 +67,14 @@ function Glyph({ kind }: { kind: ParticleKind }) {
 }
 
 function Particle({ kind, index }: { kind: ParticleKind; index: number }) {
-  const t = useSharedValue(0);
   const falls = FALLS[kind];
+  // Flies once when the particle mounts; the parent unmounts it afterwards.
+  const t = useDerivedValue(() =>
+    withDelay(
+      index * 80,
+      withTiming(1, { duration: DURATION[kind], easing: falls ? Easing.in(Easing.quad) : Easing.out(Easing.quad) })
+    )
+  );
 
   // Fixed per particle so the drift doesn't resample on every render.
   const [seed] = useState(() => ({
@@ -75,13 +82,6 @@ function Particle({ kind, index }: { kind: ParticleKind; index: number }) {
     dx: Math.random() * 70 - 35,
     rot: Math.random() * 120 - 60,
   }));
-
-  useEffect(() => {
-    t.value = withDelay(
-      index * 80,
-      withTiming(1, { duration: DURATION[kind], easing: falls ? Easing.in(Easing.quad) : Easing.out(Easing.quad) })
-    );
-  }, [t, index, kind, falls]);
 
   const style = useAnimatedStyle(() => {
     const p = t.value;

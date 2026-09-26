@@ -1,10 +1,9 @@
 import type { ReactNode } from 'react';
-import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
-  useSharedValue,
+  useDerivedValue,
   withRepeat,
   withSequence,
   withTiming,
@@ -53,16 +52,16 @@ export function Stage({
   onOpenHelp,
   children,
 }: Props) {
-  const shake = useSharedValue(0);
-
-  useEffect(() => {
-    if (shakeKey === 0) return;
-    shake.value = withSequence(
-      withTiming(-1, { duration: 60, easing: Easing.linear }),
-      withRepeat(withTiming(1, { duration: 55, easing: Easing.linear }), 5, true),
-      withTiming(0, { duration: 60 })
-    );
-  }, [shakeKey, shake]);
+  // A new shakeKey restarts the judder; key 0 means "nothing has shaken yet".
+  const shake = useDerivedValue(() =>
+    shakeKey === 0
+      ? 0
+      : withSequence(
+          withTiming(-1, { duration: 60, easing: Easing.linear }),
+          withRepeat(withTiming(1, { duration: 55, easing: Easing.linear }), 5, true),
+          withTiming(0, { duration: 60 })
+        )
+  );
 
   const style = useAnimatedStyle(() => ({
     transform: [{ translateX: shake.value * 7 }, { translateY: shake.value * -2 }],

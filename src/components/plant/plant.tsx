@@ -5,6 +5,7 @@ import Animated, {
   cancelAnimation,
   useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withDelay,
   withRepeat,
@@ -256,15 +257,11 @@ const styles = StyleSheet.create({
 
 /** Sleepy "z"s float beside the head; rendered outside the SVG so they can fade. */
 export function SleepZs({ visible }: { visible: boolean }) {
-  const a = useSharedValue(0);
-  useEffect(() => {
-    cancelAnimation(a);
-    if (visible) {
-      a.value = withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }), -1, true);
-    } else {
-      a.value = withTiming(0, { duration: 200 });
-    }
-  }, [visible, a]);
+  const a = useDerivedValue(() =>
+    visible
+      ? withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.ease) }), -1, true)
+      : withTiming(0, { duration: 200 })
+  );
 
   const one = useAnimatedStyle(() => ({ opacity: a.value * 0.9, transform: [{ translateY: -a.value * 10 }] }));
   const two = useAnimatedStyle(() => ({
